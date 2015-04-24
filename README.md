@@ -1,2 +1,2 @@
 # ziria-sem
-High-level implementations of Ziria semantics
+High-level implementation of Ziria semantics as well as experimentation.
