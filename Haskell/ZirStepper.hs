@@ -57,10 +57,12 @@ zpipe :: SZir i m v -> SZir m o v -> SZir i o v
 zpipe (SZir s1 step1) (SZir s2 step2) = 
    let sinit = (s1,s2)
        step (s1,s2) = 
-         case step2 s2 of 
+         case step2 s2 of
+           Skip s2' -> Skip (s1,s2')
            Done v -> Done v
            Yield s2' o  -> Yield (s1,s2') o
            NeedInput g2 -> case step1 s1 of
+             Skip s1' -> Skip (s1',s2)
              Done v -> Done v
              Yield s1' m -> Skip (s1', g2 m)
              NeedInput g1 -> NeedInput (\i -> (g1 i, s2))
@@ -70,11 +72,13 @@ zrepeat p = zbind p (\() -> zrepeat p)
 testC = zbind ztake zemit
 
 -- A single recursive function
-run :: [i] -> SZir i o v -> v
-run ins (SZir s step) = loop ins (step s)
+run :: Show o => [i] -> SZir i o v -> ([o], v)
+run ins (SZir s step) = loop [] ins (step s)
   where 
-    loop ins (Done v) = v
-    loop ins (Yield s' o)      = loop ins (step s') 
-    loop ins (Skip s')         = loop ins (step s')
-    loop (i:ins) (NeedInput g) = loop ins (step (g i))
+    loop acc ins (Done v)          = (reverse acc, v)
+    loop acc ins (Yield s' o)      = loop (o : acc) ins (step s') 
+    loop acc ins (Skip s')         = loop acc ins (step s')
+    loop acc (i:ins) (NeedInput g) = loop acc ins (step (g i))
+    loop acc [] (NeedInput g)
+      = error $ "Need more inputs! Outputs were: " ++ show (reverse acc)
 
