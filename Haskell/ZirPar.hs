@@ -1,148 +1,164 @@
 module ZirPar where
 
+import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
 
-rw :: TChan a -> TChan a -> STM ()
-rw ch_in ch_out
+copy_one :: TChan a -> TChan a -> STM ()
+copy_one ch_in ch_out
   = do { ma <- tryReadTChan ch_in
        ; case ma of
            Nothing -> return ()
            Just a -> writeTChan ch_out a
        }
-    
-forever :: STM u -> STM u
-forever f = f >> forever f
 
-mux :: TChan v -> TChan a -> TChan a -> TChan a -> STM ()
-mux ctl as1 as2 out_chan = go ctl as1 as2 out_chan
-  where go ctl as1 as2 out_chan
-          = do { mswitch  <- tryReadTChan ctl
-               ; case mswitch of
-                   Nothing -> rw as1 out_chan 
-                   Just _  -> rw as2 out_chan 
+forever :: IO a -> IO a
+forever a = a >> forever a
+
+block_on :: TChan v1 -> (v1 ->  Zir a b v2) -> Zir a b v2
+block_on ch f = Zir go
+  where go as bs ctl 
+          = do { ma <- atomically $ tryReadTChan ch
+               ; case ma of
+                   Nothing -> unZir (block_on ch f) as bs ctl
+                   Just a  -> unZir (f a) as bs ctl
                }
-                      
+
+mux :: TChan v -> TChan a -> TChan a -> TChan a -> IO ()
+mux ctl_chan in_chan1 in_chan2 out_chan
+  = do { behave_as_chan2 <-
+            atomically
+            $ do { in_chan1_flushed <- isEmptyTChan in_chan1
+                 ; ctl_chan_empty   <- isEmptyTChan ctl_chan
+                 ; return $ in_chan1_flushed && not ctl_chan_empty
+                 }
+       ; atomically
+         $ if behave_as_chan2 then copy_one in_chan2 out_chan
+           else copy_one in_chan1 out_chan
+       }
+
+print_one ch
+  = do { mv <- atomically $ tryReadTChan ch
+       ; case mv of
+           Nothing -> return ()
+           Just v  -> putStrLn (show v)
+       }
+
+forkChild :: MVar [MVar ()] -> IO () -> IO ThreadId
+forkChild children f
+  = do { mvar <- newEmptyMVar
+       ; cs <- takeMVar children         
+       ; putMVar children (mvar : cs)
+       ; forkFinally f (\_ -> putMVar mvar ())
+       }
+
+waitForChildren :: MVar [MVar ()] -> IO ()
+waitForChildren children
+  = do { cs <- takeMVar children
+       ; case cs of
+           [] -> return ()
+           (c : cs') ->
+             do { putMVar children cs'
+                ; takeMVar c
+                ; waitForChildren children
+                }
+       }
+
+test_mux
+  = do { in_chan1 <- newTChanIO
+       ; in_chan2 <- newTChanIO
+       ; ctl_chan <- newTChanIO
+       ; out_chan <- newTChanIO
+       ; children <- newMVar []
+       ; forkChild children
+         $ atomically $ do { writeTChan in_chan1 3; writeTChan ctl_chan () }
+       ; forkChild children $ atomically (writeTChan in_chan2 4)
+       ; forkChild children $ forever $ mux ctl_chan in_chan1 in_chan2 out_chan
+       ; forkChild children $ forever $ print_one out_chan
+       ; waitForChildren children
+       }
+
 dup :: TChan a -> STM (TChan a,TChan a)
 dup as
   = do { as' <- cloneTChan as
        ; return (as,as')
        }
 
-newtype Zir a b v = Zir { unZir :: TChan a -> TChan b -> TChan v -> STM () }
+newtype Zir a b v = Zir { unZir :: TChan a -> TChan b -> TChan v -> IO () }
 
 ztake :: Zir a b a
 ztake = Zir go
-  where go as bs ctl = rw as ctl >> return ()
+  where go as bs ctl = atomically (copy_one as ctl) >> return ()
 
 zemit :: b -> Zir a b ()
 zemit b = Zir go
   where go as bs ctl
-          = do { writeTChan bs b
-               ; writeTChan ctl ()
-               }
+          = atomically 
+            $ do { writeTChan bs b
+                 ; writeTChan ctl ()
+                 }
 
 zbind :: Zir a b v1 -> (v1 -> Zir a b v2) -> Zir a b v2
 zbind z1 f = Zir go
   where go as bs ctl
-          = do { let (as1,as2) = (as,as)
-               ; bs1 <- newTChan
-               ; bs2 <- newTChan
-               ; priv_ctl <- newTChan
-               ; (z2_start,mux_switch) <- dup priv_ctl
-               ; unZir z1 as1 bs1 z2_start
-               ; go2 z2_start as2 bs2 ctl
-               ; mux mux_switch bs1 bs2 bs
-               }
-        go2 start as0 bs0 ctl0
-          = do { mv1 <- tryReadTChan start
-               ; case mv1 of
-                   Nothing -> return ()
-                   Just v1 -> unZir (f v1) as0 bs0 ctl0
+          = do { bs1 <- newTChanIO
+               ; bs2 <- newTChanIO
+               ; new_ctl <- newTChanIO
+               ; (z1_done,mux_switch) <- atomically $ dup new_ctl
+               ; children <- newMVar []
+               ; forkChild children $ unZir z1 as bs1 z1_done
+               ; forkChild children $ unZir (block_on z1_done f) as bs2 ctl
+               ; forkChild children $ mux mux_switch bs1 bs2 bs
+               ; waitForChildren children
                }
 
 zpipe :: Zir a b v -> Zir b c v -> Zir a c v
 zpipe z1 z2 = Zir go
   where go as cs ctl
-          = do { bs <- newTChan 
-               ; unZir z1 as bs ctl
-               ; unZir z2 bs cs ctl
+          = do { bs <- newTChanIO
+               ; children <- newMVar []
+               ; forkChild children $ unZir z1 as bs ctl
+               ; forkChild children $ unZir z2 bs cs ctl
+               ; waitForChildren children
                }
-    
-test_emit_take
-  = do { a0 <- newTChan
-       ; a <- newTChan
-       ; b <- newTChan
-       ; c0 <- newTChan              
-       ; c <- newTChan
-       ; unZir (zemit 2) a0 a c0
-       ; unZir ztake a b c
-       ; tryReadTChan c
-       }
 
-test_mux
-  = do { in_chan1 <- newTChan
-       ; in_chan2 <- newTChan
-       ; ctl_chan <- newTChan
-       ; out_chan <- newTChan                     
-       ; writeTChan in_chan1 1
-       ; mux in_chan1 in_chan2 ctl_chan out_chan
-       ; tryReadTChan out_chan
-       }
+zrepeat :: Zir a b v -> Zir a b v
+zrepeat z@(Zir f) = Zir go
+  where go as bs ctl = forever $ f as bs ctl
+        
+zmap f = zrepeat $ zbind ztake (\v -> zemit (f v))
 
-zmap f = zbind ztake (\v -> zemit (f v))
+test_zir :: Show b => Zir a b v -> [a] -> IO ()
+test_zir z as 
+  = do { in_chan <- newTChanIO
+       ; out_chan <- newTChanIO
+       ; ctl_chan <- newTChanIO
+       ; children <- newMVar []
+       ; write_to in_chan as
+       ; forkChild children $ unZir z in_chan out_chan ctl_chan
+       ; forkChild children $ forever $ print_one out_chan
+       ; waitForChildren children
+       }
+  where write_to ch [] = return ()
+        write_to ch (v : vs)
+          = do { atomically $ writeTChan ch v
+               ; write_to ch vs
+               }
 
 zinc = zmap (+ 1)
 
-zdouble = zinc `zpipe` zinc
+test_bind = test_zir zinc [1,2,3]
 
-test_bind
-  = do { in_chan <- newTChan
-       ; out_chan <- newTChan
-       ; ctl_chan <- newTChan
-       ; writeTChan in_chan 1
-       ; unZir zinc in_chan out_chan ctl_chan
-       ; tryReadTChan out_chan
-       }
+zid = zmap id
 
-test_pipe
-  = do { in_chan <- newTChan
-       ; out_chan <- newTChan
-       ; ctl_chan <- newTChan
-       ; writeTChan in_chan 1
-       ; unZir zdouble in_chan out_chan ctl_chan
-       ; tryReadTChan out_chan
-       }
+zplus2 = zid `zpipe` zid
 
-zsum
-  = zbind ztake (\v1 ->
-      zbind ztake (\v2 ->
-        zemit (v1 + v2)))
+test_pipe = test_zir zplus2 [1,2,3]
 
-test_sum
-  = do { in_chan <- newTChan
-       ; out_chan <- newTChan
-       ; ctl_chan <- newTChan
-       ; writeTChan in_chan 20
-       ; writeTChan in_chan 22
-       ; unZir zsum in_chan out_chan ctl_chan
-       ; tryReadTChan out_chan
-       }
+zsum2
+  = zrepeat
+    $ zbind ztake (\v1 ->
+        zbind ztake (\v2 ->
+          zemit (v1 + v2)))
 
-zsum_and_square
-  = zbind ztake (\v1 ->
-      zbind ztake (\v2 ->
-        zemit (v1 + v2)
-        `zpipe` zbind ztake (\v3 -> zemit (v3 * v3))))
-
-test_sum_and_square
-  = do { in_chan <- newTChan
-       ; out_chan <- newTChan
-       ; ctl_chan <- newTChan
-       ; writeTChan in_chan 20
-       ; writeTChan in_chan 22
-       ; unZir zsum_and_square in_chan out_chan ctl_chan
-       ; tryReadTChan out_chan
-       }
-
-
+test_zsum2 = test_zir zsum2 [23,10]
