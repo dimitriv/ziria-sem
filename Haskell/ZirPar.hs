@@ -1,5 +1,10 @@
 module Main where
 
+import System.IO ( hSetBuffering
+                 , BufferMode( LineBuffering )
+                 , stdout
+		 ) 
+
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
@@ -130,7 +135,10 @@ test_bind  = test_zir zinc [1..10]
 test_pipe  = test_zir ((zpipe zinc zinc) `zpipe` (zpipe zinc zinc)) [1..10]
 test_zsum  = test_zir zsum [1..10]
 
-main = test_zir ((zinc `zpipe` zinc) `zpipe` zsum `zpipe` (zinc `zpipe` zinc)) [1..10]
+main =
+  do { hSetBuffering stdout LineBuffering
+     ; test_zir ((zinc `zpipe` zinc) `zpipe` zsum `zpipe` (zinc `zpipe` zinc)) [1..10]
+     }
 
 -- The following program may produce result '4 5' (though I haven't
 -- yet observed it) due to a pipe-bind race condition (I think the

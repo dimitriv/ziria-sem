@@ -1,10 +1,9 @@
-{-# LANGUAGE RankNTypes
-           , StandaloneDeriving
-           , GADTs
-  #-}
-
 module Main where
 
+import System.IO ( hSetBuffering
+                 , BufferMode( LineBuffering )
+                 , stdout
+		 ) 
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan
@@ -32,12 +31,9 @@ import Control.Concurrent.STM.TChan
 instance Show (TChan a) where
   show _ = "<chan>"  
 
-data Handles where
-  Handles :: TChan () -- Start chan
-          -> TChan ()  -- Done chan
-          -> Handles
+data Handles = Handles (TChan ()) (TChan ())
+  deriving Show	
 
-deriving instance Show Handles
 
 -- The dataflow graph
 
@@ -274,7 +270,10 @@ test
     zrepeat
     (zbind ztake zemit)
 
-main = test_zir (flip tick_tock (\_ -> return ())) test [1..20]
+main =
+  do { hSetBuffering stdout LineBuffering
+     ; test_zir (flip tick_tock (\_ -> return ())) test [1..20]
+     }  
 
 -----------------------------------------------------------------
 --
