@@ -54,16 +54,10 @@ newtype Zir a b v = Zir { unZir :: -- Special parameter:
                         }
 
 ztake :: Zir a b a
-ztake = Zir go
-  where go _ as bs ctl = copy_one as ctl
+ztake = Zir (\_ as _ ctl -> copy_one as ctl)
 
 zemit :: b -> Zir a b ()
-zemit b = Zir go
-  where go _ as bs ctl
-          = do { atomically $ writeTChan bs b
-               ; atomically $ writeTChan ctl ()
-               }
-
+zemit b = Zir (\_ _ bs ctl -> atomically $ writeTChan bs b >> writeTChan ctl ())
 
 {-
 'zbind z1 (\v -> z2)' is modeled as the dataflow graph that looks
@@ -87,21 +81,19 @@ zbind z1 f = Zir go
   where go children as bs ctl
           = do { -- A private control channel between 'z1' and 'f'
                  z1_done <- newTChanIO 
-                 -- Fork z1
-               ; forkChild children $ unZir z1 children as bs z1_done
-                 -- Fork f, but block until z1 sends a control value
+               ; unZir z1 children as bs z1_done
+                 -- Fork a new thread to block until z1 sends a control value...
                ; forkChild children $ unZir (block_on z1_done f) children as bs ctl
                  -- No need to join here, we're just unfolding the graph...
                ; return ()
                }
 
--- Pipe just forks the two Zir computations 'z1' and 'z2'
 zpipe :: Zir a b v -> Zir b c v -> Zir a c v
 zpipe z1 z2 = Zir go
   where go children as cs ctl
           = do { bs <- newTChanIO
-               ; forkChild children $ unZir z1 children as bs ctl
-               ; forkChild children $ unZir z2 children bs cs ctl
+               ; unZir z1 children as bs ctl
+               ; unZir z2 children bs cs ctl
                ; return ()
                }
 
@@ -117,8 +109,8 @@ test_zir z as
        ; ctl_chan <- newTChanIO
        ; children <- newMVar []
        ; write_to in_chan as
-       ; forkChild children $ unZir z children in_chan out_chan ctl_chan
-       ; forkChild children $ forever $ print_one out_chan
+       ; forkChild children $ forever $ print_one out_chan         
+       ; unZir z children in_chan out_chan ctl_chan
        ; waitForChildren children
        }
   where write_to ch [] = return ()
