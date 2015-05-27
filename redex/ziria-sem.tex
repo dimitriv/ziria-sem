@@ -1,0 +1,515 @@
+% -*- coding: utf-8; mode: latex; mode: visual-line; mode: flyspell -*-
+\documentclass[twocolumn]{article}
+
+\usepackage{etex}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage[babel=true,activate={true,nocompatibility},final,tracking=true,kerning=true,spacing=true]{microtype}
+\usepackage{lmodern}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{bcprules}
+\usepackage{multicol}
+\usepackage{stmaryrd}
+\usepackage{xspace}
+
+\newcommand{\bnfdef}{::=}
+\newcommand{\bnfalt}{\mathrel{\mid}}
+\newcommand{\kw}[1]{\mbox{#1}}
+\newcommand{\arr}{\mathrel{<\!\!<\!\!<}}
+\newcommand{\parr}{\mathrel{|\!\!<\!\!<\!\!<\!\!|}}
+\newcommand{\types}[3]{#1 \vdash #2 \mathrel{:} #3}
+\newcommand{\join}[2]{#1 \sqcup #2}
+\newcommand{\clos}[2]{\left<#1; #2\right>}
+
+\newcommand{\thread}[4]{\left<#1; #2; #3; #4\right>}
+\newcommand{\proc}[3]{\ll\!#1; #2; #3\!\gg}
+\newcommand{\mach}[2]{\parallel\!#1; #2\!\parallel}
+
+\newcommand{\queue}[1]{\left<#1\right>}
+\newcommand{\tctx}[5]{\thread{#1}{#2}{#3}{#4}\left[#5\right]}
+\newcommand{\mctx}[3]{\mach{#1}{#2}\left[#3\right]}
+
+\newcommand{\ox}[1]{\llbracket#1\rrbracket}
+\newcommand{\tstep}{\rightarrow}
+\newcommand{\mstep}{\Rightarrow}
+\newcommand{\rref}[1]{\textsc{#1}}
+
+\newcommand{\figurebox}[1]{\fbox{\begin{minipage}{\textwidth} #1 \medskip\end{minipage}}}
+
+\newcommand{\judgment}[2]{{\bf #1} \hfill #2}
+
+\typicallabel{P-ParSpawn}
+\bcprulestwocoltrue
+%%\bcprulessavespacetrue
+
+\title{Ziria Operational Semantics}
+\author{Geoffrey Mainland}
+
+\begin{document}
+\maketitle
+
+\section{Language and Typing Relation}
+
+The semantics given in this document are implemented in PLT Redex in the file \texttt{ziria.rkt}.
+
+The expression language in Figure~\ref{fig:lang:exp} is essentially identical to the
+existing Ziria language, but all syntactic categories have been collapsed into
+the single category of expressions. In exchange, the type language in
+Figure~\ref{fig:lang:type} is rather complicated.
+
+Base types, $\tau$, are as expected. Computation types, represented by $\kappa$,
+are of the form $\kw{ST}~ \iota~ \alpha~ \beta$. Function arguments, of type
+$\rho$, may be of type $\tau$ or $\kw{ref}~ \tau$. Function results, $\sigma$,
+may be of type $\tau$ or $\kappa$; that is, functions may return
+computations. The typing context may contain values of type $\rho$ (base types
+and refs) or of type $\rho_1 \ldots \rho_n \to \sigma$ (functions). The typing
+judgment assigns expressions a type $\theta$, which may be a base type, ref
+type, computation, or function.
+
+\begin{figure}
+\begin{equation*}
+\begin{array}{lcl}
+  e, c
+     & \bnfdef & k \\
+     & \bnfalt & x \\
+     & \bnfalt & unop~ e \\
+     & \bnfalt & e~ binop~ e \\
+     & \bnfalt & \kw{if}~ e~ \kw{then}~ e~ \kw{else}~ e \\
+     & \bnfalt & \kw{let}~ x \mathrel{=} e~ \kw{in}~ e \\
+     & \bnfalt & \kw{letfun}~ f~ (x_1 : \rho_1, \ldots, x_n : \rho_n) \mathrel{=} e~ \kw{in}~ e \\
+     & \bnfalt & \kw{letref}~ x \mathrel{=} e~ \kw{in}~ e \\
+     & \bnfalt & f~ e_1~ \ldots~ e_n \\
+     & \bnfalt & \kw{!} x \\
+     & \bnfalt & x \mathrel{:=} e \\
+     & \bnfalt & \kw{return}~ e \\
+     & \bnfalt & x \mathrel{\leftarrow} c;~ c \\
+     & \bnfalt & c;~ c \\
+     & \bnfalt & \kw{take} \\
+     & \bnfalt & \kw{emit}~ e \\
+     & \bnfalt & \kw{repeat}~ c \\
+     & \bnfalt & c \arr c \\
+     & \bnfalt & c \parr c \\
+  k
+     & \bnfdef & () \\
+     & \bnfalt & \kw{true} \\
+     & \bnfalt & \kw{false} \\
+     & \bnfalt & n \\
+  unop
+     & \bnfdef & - \\
+  binop
+     & \bnfdef & \ne \\
+     & \bnfalt & = \\
+     & \bnfalt & + \\
+     & \bnfalt & - \\
+     & \bnfalt & \times \\
+     & \bnfalt & \kw{div}
+\end{array}
+\end{equation*}
+\caption{Expression language}
+\label{fig:lang:exp}
+\end{figure}
+
+\begin{figure}
+\begin{equation*}
+\begin{array}{lcl}
+  \alpha, \beta, \gamma, \nu, \tau
+     & \bnfdef & () \\
+     & \bnfalt & \kw{bool} \\
+     & \bnfalt & \kw{int} \\
+  \iota
+     & \bnfdef & \kw{C}~ \tau \\
+     & \bnfalt & \kw{T} \\
+  \kappa
+     & \bnfdef & \kw{ST}~ \iota~ \tau~ \tau~ \\
+  \rho
+     & \bnfdef & \tau \\
+     & \bnfalt & \kw{ref}~ \tau \\
+  \sigma
+     & \bnfdef & \tau \\
+     & \bnfalt & \kappa \\
+  \phi
+     & \bnfdef & \rho \\
+     & \bnfalt & \rho_1 \ldots \rho_n \to \sigma \\
+  \Gamma
+     & \bnfdef & \cdot \\
+     & \bnfalt & x : \phi, \Gamma \\
+  \theta
+     & \bnfdef & \tau \\
+     & \bnfalt & \kw{ref}~ \tau \\
+     & \bnfalt & \kappa \\
+     & \bnfalt & \rho_1 \ldots \rho_n \to \sigma
+\end{array}
+\end{equation*}
+\caption{Type language}
+\label{fig:lang:type}
+\end{figure}
+The base typing rules are given in Figure~\ref{type:base}. The rules for
+computations are given in Figure~\ref{type:comp}. Both monadic sequencing and
+monadic bind are including because treating sequencing as a derived form was
+slightly more complicated in Redex---it was easier not to generate a fresh
+variable for the binding. Notice that $\kw{map}$ has been removed. The treatment
+of $\arr$ and $\parr$ is also slightly different from the old formulation;
+$\arr$ is \emph{sequential} transformer composition, and $\parr$ is
+\emph{parallelizable} transformer composition. We may want all transformer
+composition to be parallelizable in the surface language, where $\parr$ serves
+only as an annotation indicating to the compiler that it should run the compose
+transformers in separate threads, but I've kept the distinction in the core
+language. Note that we only split the typing context for $\parr$; the intent is
+that serial transformer composition spawns two threads that operate in lockstep,
+thus allowing for a shared heap.
+
+\begin{figure*}
+\figurebox{
+\begin{multicols}{2}[\judgment{Typing Relation}{\fbox{$\types{\Gamma}{e}{\theta}$}}]
+\infax[T-Unit]
+  {\types{}{()}{()}}
+
+\infax[T-True]
+  {\types{}{\kw{true}}{\kw{bool}}}
+
+\infax[T-False]
+  {\types{}{\kw{false}}{\kw{bool}}}
+
+\infax[T-Int]
+  {\types{}{n}{\kw{bool}}}
+
+\infrule[T-Var]
+  {x:\phi \in \Gamma}
+  {\types{\Gamma}{x}{\phi}}
+
+\infrule[T-Unop]
+  {\types{\Gamma}{e}{\phi_1}}
+  {\types{\Gamma}{unop~ e}{unop_{\phi_1}(unop)}}
+
+\infrule[T-Binop]
+  {\types{\Gamma}{e_1}{\phi_1} \andalso \types{\Gamma}{e_2}{\phi_2}}
+  {\types{\Gamma}{e_1~ binop~ e_2}{binop_{\phi_1, \phi_2}(binop)}}
+
+\infrule[T-If]
+  {\types{\Gamma}{e_1}{\kw{bool}} \andalso
+    \types{\Gamma}{e_2}{\phi} \andalso
+    \types{\Gamma}{e_3}{\phi}}
+  {\types{\Gamma}{\kw{if}~ e_1~ \kw{then}~ e_2~ \kw{else}~ e_3}{\phi}}
+
+\infrule[T-Let]
+  {\types{\Gamma}{e_1}{\tau_1} \andalso
+    \types{x : \tau_1, \Gamma}{e_2}{\phi}}
+  {\types{\Gamma}{\kw{let}~ x \mathrel{=} e_1~ \kw{in}~ e_2}{\phi}}
+
+\infrule[T-LetFun]
+  {\types{x_1 : \rho_1, \ldots, x_n : \rho_n, \Gamma}{e_1}{\sigma} \\
+    \types{f : \rho_1 \ldots \rho_n \to \sigma, \Gamma}{e_2}{\theta}}
+  {\types{\Gamma}{\kw{letfun}~ f~ (x_1 : \rho_1, \ldots, x_n : \rho_n) \mathrel{=} e_1~ \kw{in}~ e_2}{\phi}}
+
+\infrule[T-Call]
+  {\types{\Gamma}{f}{\rho_1 \ldots \rho_n \to \sigma} \\
+    \types{\Gamma}{e_1}{\rho_1} \andalso \ldots \andalso \types{\Gamma}{e_n}{\rho_n}}
+  {\types{\Gamma}{f~ e_1~ \ldots e_n}{\sigma}}
+\end{multicols}
+}
+\caption{Base typing rules}
+\label{type:base}
+\end{figure*}
+
+\begin{figure*}
+\figurebox{
+\begin{multicols}{2}[\judgment{Typing Relation}{\fbox{$\types{\Gamma}{e}{\theta}$}}]
+\infrule[T-LetRef]
+  {\types{\Gamma}{e_1}{\tau_1} \andalso
+    \types{x : \kw{ref}~ \tau_1, \Gamma}{e_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+  {\types{\Gamma}{\kw{letref}~ x \mathrel{=} e_1~ \kw{in}~ e_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+
+\infrule[T-Deref]
+  {x:\kw{ref}~ \tau \in \Gamma}
+  {\types{\Gamma}{!x}{\kw{ST}~ (\kw{C}~ \tau)~ \alpha~ \beta}}
+
+\infrule[T-Set]
+  {x:\kw{ref}~ \tau \in \Gamma \andalso \types{\Gamma}{e}{\tau}}
+  {\types{\Gamma}{x \mathrel{:=} e}{\kw{ST}~ (\kw{C}~ ())~ \alpha~ \beta}}
+
+\infrule[T-Return]
+  {\types{\Gamma}{c}{\tau}}
+  {\types{\Gamma}{\kw{return}~ c}{\kw{ST}~ (\kw{C}~ \tau)~ \alpha~ \beta}}
+
+\infrule[T-Bind]
+  {\types{\Gamma}{c_1}{\kw{ST}~ (\kw{C}~ \nu)~ \alpha~ \beta} \andalso
+   \types{x : \nu, \Gamma}{c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+  {\types{\Gamma}{x \mathrel{\leftarrow} c_1;~ c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+
+\infrule[T-Seq]
+  {\types{\Gamma}{c_1}{\kw{ST}~ (\kw{C}~ \nu)~ \alpha~ \beta} \andalso
+   \types{x\Gamma}{c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+  {\types{\Gamma}{c_1;~ c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+
+\infax[T-Take]
+  {\types{\Gamma}{\kw{take}}{\kw{ST}~ (\kw{C}~ \alpha)~ \alpha~ \beta}}
+
+\infrule[T-Emit]
+  {\types{\Gamma}{e}{\beta}}
+  {\types{\Gamma}{\kw{emit}~ e}{\kw{ST}~ (\kw{C}~ ())~ \alpha~ \beta}}
+
+\infrule[T-Repeat]
+  {\types{\Gamma}{c}{\kw{ST}~ (\kw{C}~ ())~ \alpha~ \beta}}
+  {\types{\Gamma}{\kw{repeat}~ c}{\kw{ST}~ \kw{T}~ \alpha~ \beta}}
+
+\infrule[T-Arr]
+  {\types{\Gamma}{c_1}{\kw{ST}~ \iota_1~ \alpha~ \beta} \\
+   \types{\Gamma}{c_2}{\kw{ST}~ \iota_2~ \alpha~ \beta}}
+  {\types{\Gamma}{c_1 \arr c_2}{\kw{ST}~ (\join{\iota_1}{\iota_2})~ \alpha~ \beta}}
+
+\infrule[T-PArr]
+  {\Gamma_1 \oplus \Gamma_2 = \Gamma \\
+   \types{\Gamma_1}{c_1}{\kw{ST}~ \iota_1~ \alpha~ \beta} \\
+   \types{\Gamma_2}{c_2}{\kw{ST}~ \iota_2~ \alpha~ \beta}}
+  {\types{\Gamma}{c_1 \parr c_2}{\kw{ST}~ (\join{\iota_1}{\iota_2})~ \alpha~ \beta}}
+\end{multicols}
+}
+\caption{Computation typing rules}
+\label{type:comp}
+\end{figure*}
+
+\begin{figure}
+\begin{align*}
+\join{\kw{C}~ \nu}{\kw{T}} &= \kw{C}~ \nu \\
+\join{\kw{T}}{\kw{C}~ \nu} &= \kw{C}~ \nu \\
+\join{\kw{T}}{\kw{T}}      &= \kw{T}
+\end{align*}
+\caption{Definition of $\join{\cdot}{\cdot}$}
+\label{def:join}
+\end{figure}
+
+\section{Evaluation}
+
+\begin{figure}
+\begin{equation*}
+\begin{array}{lcl}
+  E
+     & \bnfdef & unop~ E \\
+     & \bnfalt & E~ binop~ e \\
+     & \bnfalt & v~ binop~ E \\
+     & \bnfalt & \kw{if}~ E~ \kw{then}~ e~ \kw{else}~ e \\
+     & \bnfalt & \kw{let}~ x \mathrel{=} E~ \kw{in}~ e \\
+     & \bnfalt & f~ v_1~ \ldots~ v_{i-1}~ E~ e_{i+1}~ \ldots~ e_n \\
+     & \bnfalt & \kw{letref}~ x \mathrel{=} E~ \kw{in}~ e \\
+     & \bnfalt & x \mathrel{:=} E \\
+     & \bnfalt & \kw{return}~ E \\
+     & \bnfalt & x \mathrel{\leftarrow} E;~ e \\
+     & \bnfalt & E;~ e \\
+     & \bnfalt & \kw{emit}~ E \\
+     & \bnfalt & \cdot \\
+  v
+     & \bnfdef & k \\
+  clos
+     & \bnfdef & \clos{x_1, \ldots, x_n}{e} \\
+  v_\sigma
+     & \bnfdef & v \\
+     & \bnfalt & \ell \\
+     & \bnfalt & clos \\
+  \Sigma
+     & \bnfdef & \emptyset \\
+     & \bnfalt & x = v_\sigma, \Sigma \\
+  H
+     & \bnfdef & \emptyset \\
+     & \bnfalt & \ell = v, H \\
+  \delta
+     & \bnfdef & \kw{tick} \\
+     & \bnfalt & \kw{wait} \\
+     & \bnfalt & \kw{cons}~ v \\
+     & \bnfalt & \kw{yield}~ v \\
+  t
+     & \bnfdef & \thread{\Sigma}{H}{e}{\delta} \\
+  Q
+     & \bnfdef & \kw{queue}~ v \ldots \\
+     & \bnfalt & \kw{mvar} \\
+     & \bnfalt & \kw{mvar}~ v \\
+  p
+     & \bnfdef & \proc{\thread{\Sigma}{H}{e}{\delta}}{q_i}{q_o} \\
+  \Phi
+     & \bnfdef & \emptyset \\
+     & \bnfalt & q = Q, \Phi \\
+\end{array}
+\end{equation*}
+\caption{Evaluation contexts}
+\label{fig:lang:context}
+\end{figure}
+
+Evaluation contexts are given in Figure~\ref{fig:lang:context}. Closures are
+represented by $clos$. Note that the semantics for function call is not
+correct---do we want proper closures or not?
+
+The store, $\Sigma$, maps variables to values, locations ($\ell$), or
+closures. The heap, $H$, maps locations to values.
+
+Threads consist of a store, a heap, an expression, and an \emph{action},
+$\delta$. This action represents the thread's interaction with the outside world
+via queues; note that threads \emph{can} share heaps, but only if the operate in
+lockstep. Otherwise all communication between threads is via queues.
+
+Processes consist of a thread and two queues, an input queue and an output
+queue.
+
+\emph{Machines} consist of a ``queue heap,'' $\Phi$, that maps queue locations
+$q$ to queues, and a collection of processes. Queues may be proper queues, which
+can contain zero or more values, denoted by $\kw{queue}$, or message boxes,
+which may contain zero or one value, denoted by $\kw{mvar}$. Sequential
+transformer composition synchronizes on message boxes, and parallel transformer
+composition synchronizes on proper queues.
+
+Evaluation is specified in the form of two small-step relations, one for
+threads, and one for machines. Figure~\ref{fig:eval:base} and
+Figure~\ref{fig:eval:comp} give the thread evaluation relation. The $\kw{take}$
+and $\kw{emit}$ expressions cause the thread to synchronize via the $\delta$
+action; $\kw{take}$ waits for a value, and $\kw{emit}$ yields a value. The nice
+thing about this alternative (with respect to the semantics from the NSDI
+submission) formulation is that is is small-step, allowing us to reason about
+threads running in parallel, and the domain and codomain are identical.
+
+The evaluation relation for machines is given in Figure~\ref{fig:eval:mach}. If
+one thread can step, then the machine can step. If a thread needs to synchronize
+via its input/output queues, then the machine can step by either enqueuing or
+dequeuing values to satisfy a thread's action, $\delta$.
+
+\begin{figure*}
+\figurebox{
+\judgment{Thread Evaluation}{\fbox{$\thread{\Sigma_1}{H_1}{e_1}{\delta_1} \tstep \thread{\Sigma_2}{H_2}{e_2}{\delta_2}$}}
+\infax[E-Var]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{x} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{\Sigma\left[x\right]}}
+
+\infax[E-Unop]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{unop~ n} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{\ox{unop~n}}}
+
+\infax[E-Binop]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{n_1~ binop~ n_2} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{\ox{n_1~ binop~ n_2}}}
+
+\infax[E-IfTrue]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{if}~ \kw{true}~ \kw{then}~ e_1~ \kw{else}~ e_2} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{e_1}}
+
+\infax[E-IfFalse]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{if}~ \kw{false}~ \kw{then}~ e_1~ \kw{else}~ e_2} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{e_2}}
+
+\infax[E-Let]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{let}~ x \mathrel{=} v~ \kw{in}~ e} \tstep
+   \tctx{\Sigma\left[x \mapsto v\right]}{H}{E}{\kw{tick}}{e}}
+
+\infax[E-LetFun]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{letfun}~ f~ (x_1 : \rho_1, \ldots, x_n : \rho_n) \mathrel{=} e_1~ \kw{in}~ e_2} \tstep \\
+   \tctx{\Sigma\left[f \mapsto \clos{x_1, \ldots, x_n}{e_1}\right]}{H}{E}{\kw{tick}}{e_2}}
+
+\infax[E-Call]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{f~ v_1~ \ldots v_n} \tstep \\
+   \tctx{\Sigma\left[x_1 \mapsto v_1, \ldots, x_n \mapsto v_n\right]}{H}{E}{\kw{tick}}{e} \\
+   \textrm{where $\Sigma[f] = \clos{x_1, \ldots, x_n}{e}$}}
+}
+\caption{Base thread evaluation relation}
+\label{fig:eval:base}
+\end{figure*}
+
+\begin{figure*}
+\figurebox{
+\judgment{Thread Evaluation}{\fbox{$\thread{\Sigma_1}{H_1}{e_1}{\delta_1} \tstep \thread{\Sigma_2}{H_2}{e_2}{\delta_2}$}}
+\infax[E-LetRef]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{letref}~ x \mathrel{=} v~ \kw{in}~ e} \tstep \\
+   \tctx{\Sigma\left[x \mapsto \ell\right]}{H\left[\ell \mapsto v\right]}{E}{\kw{tick}}{e} \\
+   \textrm{where $\ell$ fresh}}
+
+\infax[E-Deref]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{!x} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{v} \\
+   \textrm{where $\ell = \Sigma[x]$, $H[\ell] = v$}}
+
+\infax[E-Set]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{x \mathrel{:=} v} \tstep
+   \tctx{\Sigma}{H\left[\ell \mapsto v\right]}{E}{\kw{tick}}{\kw{return}~ ()} \\
+   \textrm{where $\ell = \Sigma[x]$}}
+
+\infax[E-Bind]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{x \mathrel{\leftarrow} v;~ c} \tstep
+   \tctx{\Sigma[x \mapsto v]}{H}{E}{\kw{tick}}{c}}
+
+\infax[E-Seq]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{return}~ v;~ c} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{c}}
+
+\infax[E-TakeWait]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{take}} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{wait}}{\kw{take}}}
+
+\infax[E-TakeConsume]
+  {\tctx{\Sigma}{H}{E}{\kw{cons}~ v}{\kw{take}} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{return}~ v}}
+
+\infax[E-Emit]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{emit}~ v} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{yield}~v}{\kw{return}~ ()}}
+
+\infax[E-Repeat]
+  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{repeat}~ c} \tstep
+   \tctx{\Sigma}{H}{E}{\kw{tick}}{c ;~ \kw{repeat}~ c}}
+}
+\caption{Computation thread evaluation relation}
+\label{fig:eval:comp}
+\end{figure*}
+
+\begin{figure*}
+\figurebox{
+\judgment{Machine Evaluation}{\fbox{$\mach{\Phi_1}{\proc{\thread{\Sigma_1}{H_1}{e_1}{\delta_1}}{q_{i_1}}{q_{o_1}}, \ldots} \mstep \mach{\Phi_1'}{\proc{\thread{\Sigma_1'}{H_1'}{e_1'}{\delta_1'}}{q_{i_1}'}{q_{o_1}'}, \ldots}$}}
+\infrule[P-Tick]
+  {\tctx{\Sigma_1}{H_1}{E}{\delta_1}{e_1} \tstep
+   \tctx{\Sigma_2}{H_2}{E}{\delta_2}{e_2}}
+  {\mctx{\Phi}{\ldots \proc{\thread{\Sigma_1}{H_1}{E}{\delta_1}}{q_i}{q_o} \ldots }{e_1} \mstep
+   \mctx{\Phi}{\ldots \proc{\thread{\Sigma_2}{H_2}{E}{\delta_2}}{q_i}{q_o} \ldots }{e_2}}
+
+\infax[P-Consume]
+  {\mctx{\Phi_1}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{wait}}}{q_i}{q_o} \ldots }{e} \mstep \\
+   \mctx{\Phi_2}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{cons}~ v}}{q_i}{q_o} \ldots }{e} \\
+   \text{where $(\Phi_2; v) = dequeue(\Phi_1; q_i)$}}
+
+\infax[P-Yield]
+  {\mctx{\Phi}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{yield}~ v}}{q_i}{q_o} \ldots }{e} \mstep \\
+   \mctx{enqueue(\Phi; q_o; v)}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{tick}}}{q_i}{q_o} \ldots }{e}}
+
+\infax[P-Spawn]
+  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{q = \kw{mvar}, \Phi}
+   {\ldots \proc{\thread{\Sigma}{H}{e_1}{\kw{tick}}}{q_i}{q},
+     \proc{\thread{\Sigma}{H}{e_1}{\kw{tick}}}{q}{q_o} \ldots} \\
+   \text{where $q$ fresh}}
+
+\infax[P-ParSpawn]
+  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{q = \kw{queue}, \Phi}
+   {\ldots \proc{\thread{\Sigma_1}{H}{e_1}{\kw{tick}}}{q_i}{q},
+     \proc{\thread{\Sigma_2}{H}{e_1}{\kw{tick}}}{q}{q_o} \ldots} \\
+   \text{where $q$ fresh, $\Sigma_1 \oplus \Sigma_2 = \Sigma$}}
+}
+\caption{Machine evaluation relation}
+\label{fig:eval:mach}
+\end{figure*}
+
+\begin{figure*}
+\figurebox{
+\begin{align*}
+dequeue(\ldots, q = \kw{queue}~ v_1~ v_2~ \ldots, \ldots)
+  &= (\ldots, q = \kw{queue}~ v_2~ \ldots, \ldots; v_1) \\
+dequeue(\ldots, q = \kw{mvar}~ v, \ldots)
+  &= (\ldots, q =\kw{mvar}, \ldots; v) \\ \\
+enqueue(\ldots, q = \kw{queue}~ v_1 \ldots, \ldots; q; v)
+  &= \ldots, q = \kw{queue}~ v_1 \ldots~ v, \ldots \\
+enqueue(\ldots, q = \kw{mvar}~, \ldots; q; v)
+  &= \ldots, q = \kw{mvar}~ v, \ldots
+\end{align*}
+}
+\caption{Definition of the $dequeue$ and $enqueue$ functions}
+\label{def:queue}
+\end{figure*}
+
+\end{document}
