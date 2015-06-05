@@ -111,17 +111,26 @@
   [(ref-vars (parr e_1 e_2))
    (∪ (ref-vars e_1) (ref-vars e_2))])
 
+;;
+;; Set union
+;;
 (define-metafunction Z
   ∪ : (x ...) ... -> (x ...)
   [(∪ (x_1 ...) (x_2 ...) (x_3 ...) ...) (∪ (x_1 ... x_2 ...) (x_3 ...) ...)]
   [(∪ (x_1 ...)) ,(remove-duplicates (term (x_1 ...)))]
   [(∪) ()])
 
+;;
+;; Set intersection
+;;
 (define-metafunction Z
   ∩ : (x ...) (x ...) -> (x ...)
   [(∩ (x_1 ...) (x_2 ...)) ,(filter (lambda (x) (member x (term (x_1 ...)))) (term (x_2 ...)))]
   [(∩) ()])
 
+;;
+;; Set difference
+;;
 (define-metafunction Z
   diff : (x ...) (x ...) -> (x ...)
   [(diff (x ...) ()) (x ...)]
@@ -131,6 +140,9 @@
   [(diff (x_1 ...) (x_2 x_3 ...))
    (diff (x_1 ...) (x_3 ...))])
 
+;;
+;; Set membership
+;;
 (define-metafunction Z
   ∈ : x (x ...) -> #t or #f
   [(∈ x   ())          #f]
@@ -317,7 +329,7 @@
   ;; Queue locations
   [q ::= variable-not-otherwise-mentioned]
   ;; Values
-  [v  ::= k]
+  [v ::= k]
   ;; Closures
   [clo ::= ((x ...) e)]
   ;; "Store" values. These are either values, heap locations, or closures.
@@ -511,3 +523,13 @@
   [(enqueue ((q_1 Q_1) ... (q (queue v_1 ...)) (q_2 Q_2) ...) q v) ((q_1 Q_1) ... (q (queue v_1 ... v)) (q_2 Q_2) ...)]
   [(enqueue ((q_1 Q_1) ... (q mvar)            (q_2 Q_2) ...) q v) ((q_1 Q_1) ... (q (mvar v))          (q_2 Q_2) ...)]
   [(enqueue Φ q v) #f])
+
+;;
+;; A simple macro to catch exceptions thrown by the error function
+;;
+(define-syntax try
+  (syntax-rules ()
+    [(_ body) (with-handlers ([exn:fail? (lambda (exn)
+                                           (displayln (exn-message exn))
+                                           #f)])
+                body)]))

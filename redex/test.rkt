@@ -96,16 +96,16 @@
   (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) ((proc (thread () () ,e tick) q_1 q_2)))))
 
 ;;
-;; Test that running a Ziria expression with a given output yields the specified output
+;; Test that running a Ziria expression with a given intput yields the specified output
 ;;
 (define (test-output e in out)
   (define (mach-output m)
     (match m
-      [(list mach (list _ ... (list _ (list 'queue v ...))) (list _ ...)) v]))
+      [(list mach (list _ ... (list _ (list 'queue v ...))) _) v]))
   (test-->>∃
    Zmach
-    (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) ((proc (thread () () ,e tick) q_1 q_2))))
-    (lambda (m) (equal? (mach-output m) out))))
+   (exp->mach e in)
+   (lambda (m) (equal? (mach-output m) out))))
 
 (define pipe
   (term (repeat ,(do x <- take
