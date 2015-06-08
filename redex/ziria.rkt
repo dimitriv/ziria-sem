@@ -30,6 +30,7 @@
   [unop ::= -]
   [binop ::= !=
              =
+             <
              +
              -
              *
@@ -280,6 +281,7 @@
   binop-type : binop -> (θ θ θ)
   [(binop-type =)   (int int bool)]
   [(binop-type !=)  (int int bool)]
+  [(binop-type <)   (int int bool)]
   [(binop-type +)   (int int int)]
   [(binop-type -)   (int int int)]
   [(binop-type *)   (int int int)]
@@ -334,14 +336,13 @@
   [v ::= k]
   ;; Closures
   [clo ::= ((x ...) e Σ)]
-  ;; "Store" values. These are either values, heap locations, or closures.
-  [vσ ::= v
-          l
-          clo]
   ;; Store
-  [Σ ::= ((x vσ) ...)]
+  [Σ ::= ((x l) ...)]
   ;; Heap
-  [H ::= ((l v) ...)]
+  [H ::= ((l hv) ...)]
+  ;; Heap values. These are either values or closures.
+  [hv ::= v
+          clo]
   ;; Actions
   [δ ::= tick
          wait
@@ -367,7 +368,8 @@
    #:domain t
    [--> (thread Σ H x κ tick)
         (thread Σ H v κ tick)
-        (where v (lookup x Σ))
+        (where l (lookup x Σ))
+        (where v (lookup l H))
         "E-Var"]
    
    [--> (thread Σ H (unop e) κ              tick)
@@ -386,13 +388,15 @@
         (thread Σ H e_1             (letk x e_2 κ) tick)
         "E-Let"]
    
-   [--> (thread Σ_1 H (letfun f ((x : τ) ...) e_1 e_2) κ tick)
-        (thread Σ_2 H e_2                              κ tick)
-        (where Σ_2 (extend f ((x ...) e_1 Σ_1) Σ_1))
+   [--> (thread Σ_1 H_1 (letfun f ((x : τ) ...) e_1 e_2) κ            tick)
+        (thread Σ_2 H_2 e_2                              (popk Σ_1 κ) tick)
+        (where l   ,(variable-not-in (term H_1) 'l))
+        (where Σ_2 (extend f l Σ_1))
+        (where H_2 (extend l ((x ...) e_1 Σ_2) H_1))
         "E-LetFun"]
    
-   [--> (thread Σ H (f v_1 ... e_1 e_2 ...) κ                              tick)
-        (thread Σ H e_1                     (argk f (v_1 ...) (e_2 ...) κ) tick)
+   [--> (thread Σ H (f e_1 e_2 ...) κ                       tick)
+        (thread Σ H e_1             (argk f () (e_2 ...) κ) tick)
         "E-Call"]
    
    [--> (thread Σ H (letref x e_1 e_2) κ                 tick)
@@ -411,6 +415,7 @@
    
    [--> (thread Σ H (return e) κ           tick)
         (thread Σ H e          (returnk κ) tick)
+        (side-condition (not (redex-match Zv v (term e))))
         "E-Return"]
    
    [--> (thread Σ H (bind x e_1 e_2) κ               tick)
@@ -465,20 +470,25 @@
         (thread Σ H e_2   κ               tick)
         "E-IfFalseK"]
    
-   [--> (thread Σ_1 H v (letk x e κ) tick)
-        (thread Σ_2 H e (popk Σ_1 κ)   tick)
-        (where Σ_2 (extend x v Σ_1))
+   [--> (thread Σ_1 H_1 v (letk x e κ) tick)
+        (thread Σ_2 H_2 e (popk Σ_1 κ) tick)
+        (where l   ,(variable-not-in (term H_1) 'l))
+        (where Σ_2 (extend x l Σ_1))
+        (where H_2 (extend l v H_1))
         "E-LetK"]
    
    [--> (thread Σ H v_2 (argk f (v_1 ...)     (e_1 e_2 ...) κ) tick)
         (thread Σ H e_1 (argk f (v_1 ... v_2) (e_2 ...) κ)     tick)
         "E-ArgK"]
    
-   [--> (thread Σ_1 H v_2 (argk f (v_1 ...) () κ) tick)
-        (thread Σ_2 H e   (popk Σ_2 κ)            tick)
+   [--> (thread Σ_1 H_1 v_2 (argk f (v_1 ...) () κ) tick)
+        (thread Σ_2 H_2 e_f (popk Σ_1 κ)            tick)
         (where (v ..._1) (v_1 ... v_2))
-        (where ((x ..._1) e Σ_f) (lookup f Σ_1))
-        (where Σ_2 (extends ((x v) ...) Σ_f))
+        (where (l ..._1) ,(variables-not-in (term H_1) (replicate (length (term (v ...))) 'l)))
+        (where l_f (lookup f Σ_1))
+        (where ((x ..._1) e_f Σ_f) (lookup l_f H_1))
+        (where Σ_2 (extends ((x l) ...) Σ_1))
+        (where H_2 (extends ((l v) ...) H_1))
         "E-CallK"]
    
    [--> (thread Σ_1 H_1 v (letrefk x e κ) tick)
@@ -498,9 +508,11 @@
         (thread Σ H (return v) κ           tick)
         "E-ReturnK"]
    
-   [--> (thread Σ_1 H (return v) (bindk x e κ) tick)
-        (thread Σ_2 H e          (popk Σ_1 κ)  tick)
-        (where Σ_2 (extend x v Σ_1))
+   [--> (thread Σ_1 H_1 (return v) (bindk x e κ) tick)
+        (thread Σ_2 H_2 e          (popk Σ_1 κ)  tick)
+        (where l   ,(variable-not-in (term H_1) 'l))
+        (where Σ_2 (extend x l Σ_1))
+        (where H_2 (extend l v H_1))
         "E-BindK"]
    
    [--> (thread Σ H (return v) (seqk e κ) tick)
@@ -511,6 +523,11 @@
         (thread Σ H (return ()) κ         (yield v))
         "E-EmitK"]))
 
+(define (replicate n x)
+  (if (= n 0)
+      null
+      (cons x (replicate (- n 1) x))))
+
 (define-metafunction Zv
   [(meta-unop - number) ,(apply - (term (number)))])
 
@@ -519,6 +536,7 @@
   [(meta-binop =   number_1 number_2) false]
   [(meta-binop !=  number   number)   false]
   [(meta-binop !=  number_1 number_2) true]
+  [(meta-binop <   number_1 number_2) ,(if (apply < (term (number_1 number_2))) (term true) (term false))]
   [(meta-binop +   number_1 number_2) ,(apply + (term (number_1 number_2)))]
   [(meta-binop -   number_1 number_2) ,(apply - (term (number_1 number_2)))]
   [(meta-binop *   number_1 number_2) ,(apply * (term (number_1 number_2)))]
@@ -528,20 +546,17 @@
   split-Σ : Σ e e -> (Σ Σ)
   [(split-Σ () e_1 e_2)
    (() ())]
-  [(split-Σ ((x_1 l_1) (x vσ) ...) e_1 e_2)
+  [(split-Σ ((x_1 l_1) (x_2 l_2) ...) e_1 e_2)
    (((x_1 l_1) . Σ_1) Σ_2)
-   (where (Σ_1 Σ_2) (split-Σ ((x vσ) ...) e_1 e_2))
+   (where (Σ_1 Σ_2) (split-Σ ((x_2 l_2) ...) e_1 e_2))
    (side-condition (term (∈ x_1 (ref-vars e_1))))]
-  [(split-Σ ((x_1 l_1) (x vσ) ...) e_1 e_2)
+  [(split-Σ ((x_1 l_1) (x_2 l_2) ...) e_1 e_2)
    (Σ_1 ((x_1 l_1) . Σ_2))
-   (where (Σ_1 Σ_2) (split-Σ ((x vσ) ...) e_1 e_2))
+   (where (Σ_1 Σ_2) (split-Σ ((x_2 l_2) ...) e_1 e_2))
    (side-condition (term (∈ x_1 (ref-vars e_2))))]
-  [(split-Σ ((x_1 l_1) (x vσ) ...) e_1 e_2)
-   (Σ_1 Σ_2)
-   (where (Σ_1 Σ_2) (split-Σ ((x vσ) ...) e_1 e_2))]
-  [(split-Σ ((x_1 vσ_1) (x vσ) ...) e_1 e_2)
-   (((x_1 vσ_1) . Σ_1) (((x_1 vσ_1) . Σ_2)))
-   (where (Σ_1 Σ_2) (split-Γ ((x vσ) ...) e_1 e_2))])
+  [(split-Σ ((x_1 l_1) (x_2 l_2) ...) e_1 e_2)
+   (((x_1 l_1) . Σ_1) ((x_1 l_1) . Σ_2))
+   (where (Σ_1 Σ_2) (split-Σ ((x_2 l_2) ...) e_1 e_2))])
 
 (define-judgment-form
   Zv

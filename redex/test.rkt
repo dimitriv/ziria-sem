@@ -45,30 +45,35 @@
 ;; Testing the thread reduction relation
 ;;
 
-(define (test-eval-exp Σ e1 e2)
-  (define (thread-exp thread)
-    (match thread
-      [(list thread _ _ e halt _) e]))
+(define (test-eval-exp Σ H e1 e2)
+  (define (thread-exp-matches t)
+    (match t
+      [`(thread ,_ ,_ ,e halt tick) (eq? e e2)]
+      [_ #f]))
   (test-->>∃
    Zred
-   (term (thread ,Σ () ,e1 halt tick))
-   (lambda (t) (eq? e2 (thread-exp t)))))
+   (term (thread ,Σ ,H ,e1 halt tick))
+   thread-exp-matches))
 
-(test-eval-exp '()
+(test-eval-exp '() '()
                (term (if (= 10 (+ 9 1)) (+ 1 10) (- 19)))
                11)
 
-(test-eval-exp '((x 3))
+(test-eval-exp '((x l)) '((l 3))
                (term (if (= x 3) 1 0))
                1)
 
-(test-eval-exp '()
+(test-eval-exp '() '()
                (term (let x (+ 1 2) (+ x x)))
                6)
 
-(test-eval-exp '()
+(test-eval-exp '() '()
                (term (letfun plus ((x : int) (y : int)) (+ x y) (plus 1 2)))
                3)
+
+(test-eval-exp '() '()
+               (term (letfun fact ((x : int)) (if (< x 2) 1 (* x (fact (- x 1)))) (fact 4)))
+               24)
 
 ;;
 ;; Testing the machine reduction rule
@@ -101,7 +106,7 @@
 (define (test-output e in out)
   (define (mach-output m)
     (match m
-      [(list mach (list _ ... (list _ (list 'queue v ...))) _) v]))
+      [(list 'mach (list _ ... (list _ (list 'queue v ...))) _) v]))
   (test-->>∃
    Zmach
    (exp->mach e in)
