@@ -40,17 +40,17 @@
                  int]
   [ι (C τ)
      T]
-  [κ (ST ι τ τ)]
+  [μ (ST ι τ τ)]
   [ρ ::= τ
          (ref τ)]
   [σ ::= τ
-         κ]
+         μ]
   [φ ::= ρ
          (→ (ρ ...) σ)]
   [Γ ::= ((x φ) ...)]
   [θ ::= τ
          (ref τ)
-         κ
+         μ
          (→ (ρ ...) σ)])
 
 (define-metafunction Z
@@ -311,19 +311,21 @@
    (where (Γ_1 Γ_2) (split-Γ ((x φ) ...) e_1 e_2))])
 
 (define-extended-language Zv Z
-  [E ::= (unop E)
-         (binop E e)
-         (binop v E)
-         (if E e e)
-         (let x E e)
-         (f v ... E e ...)
-         (letref x E e)
-         (set x E)
-         (return E)
-         (bind x E e)
-         (seq E e)
-         (emit E)
-         hole]
+  ;; Continuations
+  [κ ::= halt
+         (popk Σ κ)
+         (unopk unop κ)
+         (binop1k binop e κ)
+         (binop2k binop number κ)
+         (ifk e e κ)
+         (letk x e κ)
+         (argk f (v ...) (e ...) κ)
+         (letrefk x e κ)
+         (setk x κ)
+         (returnk κ)
+         (bindk x e κ)
+         (seqk e κ)
+         (emitk κ)]
   ;; Locations
   [l ::= variable-not-otherwise-mentioned]
   ;; Queue locations
@@ -331,7 +333,7 @@
   ;; Values
   [v ::= k]
   ;; Closures
-  [clo ::= ((x ...) e)]
+  [clo ::= ((x ...) e Σ)]
   ;; "Store" values. These are either values, heap locations, or closures.
   [vσ ::= v
           l
@@ -346,7 +348,7 @@
          (cons v)
          (yield v)]
   ;; Threads
-  [t ::= (thread Σ H e δ)]
+  [t ::= (thread Σ H e κ δ)]
   ;; Queues
   [Q I O ::= (queue v ...)
              mvar
@@ -363,87 +365,151 @@
   (reduction-relation
    Zv
    #:domain t
-   [--> (in-hole (thread Σ H E tick) x)
-        (in-hole (thread Σ H E tick) v)
+   [--> (thread Σ H x κ tick)
+        (thread Σ H v κ tick)
         (where v (lookup x Σ))
         "E-Var"]
    
-   [--> (in-hole (thread Σ H E tick) (unop number))
-        (in-hole (thread Σ H E tick) (meta-unop unop number))
+   [--> (thread Σ H (unop e) κ              tick)
+        (thread Σ H e        (unopk unop κ) tick)
         "E-Unop"]
    
-   [--> (in-hole (thread Σ H E tick) (binop number_1 number_2))
-        (in-hole (thread Σ H E tick) (meta-binop binop number_1 number_2))
+   [--> (thread Σ H (binop e_1 e_2) κ                    tick)
+        (thread Σ H e_1            (binop1k binop e_2 κ) tick)
         "E-Binop"]
    
-   [--> (in-hole (thread Σ H E tick) (if true e_1 e_2))
-        (in-hole (thread Σ H E tick) e_1)
-        "E-IfTrue"]
+   [--> (thread Σ H (if e_1 e_2 e_3) κ               tick)
+        (thread Σ H e_1              (ifk e_2 e_3 κ) tick)
+        "E-If"]
    
-   [--> (in-hole (thread Σ H E tick) (if false e_1 e_2))
-        (in-hole (thread Σ H E tick) e_2)
-        "E-IfFalse"]
-   
-   [--> (in-hole (thread Σ_1 H E tick) (let x v e))
-        (in-hole (thread Σ_2 H E tick) e)
-        (where Σ_2 (extend x v Σ_1))
+   [--> (thread Σ H (let x e_1 e_2) κ              tick)
+        (thread Σ H e_1             (letk x e_2 κ) tick)
         "E-Let"]
    
-   [--> (in-hole (thread Σ_1 H E tick) (letfun f ((x : τ) ...) e_1 e_2))
-        (in-hole (thread Σ_2 H E tick) e_2)
-        (where Σ_2 (extend f ((x ...) e_1) Σ_1))
+   [--> (thread Σ_1 H (letfun f ((x : τ) ...) e_1 e_2) κ tick)
+        (thread Σ_2 H e_2                              κ tick)
+        (where Σ_2 (extend f ((x ...) e_1 Σ_1) Σ_1))
         "E-LetFun"]
    
-   [--> (in-hole (thread Σ_1 H E tick) (f v ..._1))
-        (in-hole (thread Σ_2 H E tick) e)
-        (where ((x ..._1) e) (lookup f Σ_1))
-        (where Σ_2 (extends ((x v) ...) Σ_1))
+   [--> (thread Σ H (f v_1 ... e_1 e_2 ...) κ                              tick)
+        (thread Σ H e_1                     (argk f (v_1 ...) (e_2 ...) κ) tick)
         "E-Call"]
    
-   [--> (in-hole (thread Σ_1 H_1 E tick) (letref x v e))
-        (in-hole (thread Σ_2 H_2 E tick) e)
-        (where l ,(variable-not-in (term H_1) 'l))
-        (where Σ_2 (extend x l Σ_1))
-        (where H_2 (extend l v H_1))
+   [--> (thread Σ H (letref x e_1 e_2) κ                 tick)
+        (thread Σ H e_1                (letrefk x e_2 κ) tick)
         "E-LetRef"]
    
-   [--> (in-hole (thread Σ H E tick) (deref x))
-        (in-hole (thread Σ H E tick) (return v))
+   [--> (thread Σ H (deref x)  κ tick)
+        (thread Σ H (return v) κ tick)
         (where l (lookup x Σ))
         (where v (lookup l H))
         "E-Deref"]
    
-   [--> (in-hole (thread Σ H_1 E tick) (set x v))
-        (in-hole (thread Σ H_2 E tick) (return ()))
-        (where l (lookup x Σ))
-        (where H_2 (extend l v H_1))
+   [--> (thread Σ H (set x e) κ          tick)
+        (thread Σ H e         (setk x κ) tick)
         "E-Set"]
    
-   [--> (in-hole (thread Σ_1 H E tick) (bind x (return v) e))
-        (in-hole (thread Σ_2 H E tick) e)
-        (where Σ_2 (extend x v Σ_1))
+   [--> (thread Σ H (return e) κ           tick)
+        (thread Σ H e          (returnk κ) tick)
+        "E-Return"]
+   
+   [--> (thread Σ H (bind x e_1 e_2) κ               tick)
+        (thread Σ H e_1              (bindk x e_2 κ) tick)
         "E-Bind"]
    
-   [--> (in-hole (thread Σ H E tick) (seq (return v) e_2))
-        (in-hole (thread Σ H E tick) e_2)
-        (fresh x)
+   [--> (thread Σ H (seq e_1 e_2) κ            tick)
+        (thread Σ H e_1           (seqk e_2 κ) tick)
         "E-Seq"]
    
-   [--> (in-hole (thread Σ H E tick) take)
-        (in-hole (thread Σ H E wait) take)
+   [--> (thread Σ H take κ tick)
+        (thread Σ H take κ wait)
         "E-TakeWait"]
    
-   [--> (in-hole (thread Σ H E (cons v)) take)
-        (in-hole (thread Σ H E tick)     (return v))
+   [--> (thread Σ H take       κ (cons v))
+        (thread Σ H (return v) κ tick)
         "E-TakeConsume"]
    
-   [--> (in-hole (thread Σ H E tick)      (emit v))
-        (in-hole (thread Σ H E (yield v)) (return ()))
+   [--> (thread Σ H (emit e) κ         tick)
+        (thread Σ H e        (emitk κ) tick)
         "E-Emit"]
    
-   [--> (in-hole (thread Σ H E tick) (repeat e))
-        (in-hole (thread Σ H E tick) (seq e (repeat e)))
-        "E-Repeat"]))
+   [--> (thread Σ H (repeat e)         κ tick)
+        (thread Σ H (seq e (repeat e)) κ tick)
+        "E-Repeat"]
+   
+   [--> (thread _ H v (popk Σ κ) tick)
+        (thread Σ H v κ          tick)
+        "E-PopK"]
+   
+   [--> (thread _ H (return v) (popk Σ κ) tick)
+        (thread Σ H (return v) κ          tick)
+        "E-PopReturnK"]
+   
+   [--> (thread Σ H number                  (unopk unop κ) tick)
+        (thread Σ H (meta-unop unop number) κ              tick)
+        "E-UnopK"]
+   
+   [--> (thread Σ H number (binop1k binop e κ)      tick)
+        (thread Σ H e      (binop2k binop number κ) tick)
+        "E-Binop1K"]
+   
+   [--> (thread Σ H number_2                             (binop2k binop number_1 κ) tick)
+        (thread Σ H (meta-binop binop number_1 number_2) κ                          tick)
+        "E-Binop2K"]
+   
+   [--> (thread Σ H true (ifk e_1 e_2 κ) tick)
+        (thread Σ H e_1  κ               tick)
+        "E-IfTrueK"]
+   
+   [--> (thread Σ H false (ifk e_1 e_2 κ) tick)
+        (thread Σ H e_2   κ               tick)
+        "E-IfFalseK"]
+   
+   [--> (thread Σ_1 H v (letk x e κ) tick)
+        (thread Σ_2 H e (popk Σ_1 κ)   tick)
+        (where Σ_2 (extend x v Σ_1))
+        "E-LetK"]
+   
+   [--> (thread Σ H v_2 (argk f (v_1 ...)     (e_1 e_2 ...) κ) tick)
+        (thread Σ H e_1 (argk f (v_1 ... v_2) (e_2 ...) κ)     tick)
+        "E-ArgK"]
+   
+   [--> (thread Σ_1 H v_2 (argk f (v_1 ...) () κ) tick)
+        (thread Σ_2 H e   (popk Σ_2 κ)            tick)
+        (where (v ..._1) (v_1 ... v_2))
+        (where ((x ..._1) e Σ_f) (lookup f Σ_1))
+        (where Σ_2 (extends ((x v) ...) Σ_f))
+        "E-CallK"]
+   
+   [--> (thread Σ_1 H_1 v (letrefk x e κ) tick)
+        (thread Σ_2 H_2 e (popk Σ_1 κ)   tick)
+        (where l   ,(variable-not-in (term H_1) 'l))
+        (where Σ_2 (extend x l Σ_1))
+        (where H_2 (extend l v H_1))
+        "E-LetRefK"]
+   
+   [--> (thread Σ H_1 v           (setk x κ) tick)
+        (thread Σ H_2 (return ()) κ          tick)
+        (where l   (lookup x Σ))
+        (where H_2 (extend l v H_1))
+        "E-SetK"]
+   
+   [--> (thread Σ H v          (returnk κ) tick)
+        (thread Σ H (return v) κ           tick)
+        "E-ReturnK"]
+   
+   [--> (thread Σ_1 H (return v) (bindk x e κ) tick)
+        (thread Σ_2 H e          (popk Σ_1 κ)  tick)
+        (where Σ_2 (extend x v Σ_1))
+        "E-BindK"]
+   
+   [--> (thread Σ H (return v) (seqk e κ) tick)
+        (thread Σ H e          κ          tick)
+        "E-SeqK"]
+   
+   [--> (thread Σ H v           (emitk κ) tick)
+        (thread Σ H (return ()) κ         (yield v))
+        "E-EmitK"]))
 
 (define-metafunction Zv
   [(meta-unop - number) ,(apply - (term (number)))])
@@ -482,32 +548,36 @@
   #:mode (→z I O)
   #:contract (→z t t)
   
-  [(where (t_1 ... t t_2 ...) ,(apply-reduction-relation Zred (term (thread Σ H e δ))))
-   ------------------------------------------------------------------------------------
-   (→z (thread Σ H e δ) t)])
+  [(where (t_1 ... t t_2 ...) ,(apply-reduction-relation Zred (term (thread Σ H e κ δ))))
+   --------------------------------------------------------------------------------------
+   (→z (thread Σ H e κ δ) t)])
 
 (define Zmach
   (reduction-relation
    Zv
    #:domain m
-   [--> (in-hole (mach Φ (p_1 ... (proc (thread Σ_1 H_1 E δ_1) q_1 q_2) p_2 ...)) e_1)
-        (in-hole (mach Φ (p_1 ... (proc (thread Σ_2 H_2 E δ_2) q_1 q_2) p_2 ...)) e_2)
-        (judgment-holds (→z (thread Σ_1 H_1 e_1 δ_1) (thread Σ_2 H_2 e_2 δ_2)))
+   [--> (mach Φ (p_1 ... (proc (thread Σ_1 H_1 e_1 κ_1 δ_1) q_1 q_2) p_2 ...))
+        (mach Φ (p_1 ... (proc (thread Σ_2 H_2 e_2 κ_2 δ_2) q_1 q_2) p_2 ...))
+        (judgment-holds (→z (thread Σ_1 H_1 e_1 κ_1 δ_1) (thread Σ_2 H_2 e_2 κ_2 δ_2)))
         "P-Tick"]
-   [--> (in-hole (mach Φ_1 (p_1 ... (proc (thread Σ H E wait)     q_1 q_2) p_2 ...)) e)
-        (in-hole (mach Φ_2 (p_1 ... (proc (thread Σ H E (cons v)) q_1 q_2) p_2 ...)) e)
+   
+   [--> (mach Φ_1 (p_1 ... (proc (thread Σ H e κ wait)     q_1 q_2) p_2 ...))
+        (mach Φ_2 (p_1 ... (proc (thread Σ H e κ (cons v)) q_1 q_2) p_2 ...))
         (where (Φ_2 v) (dequeue Φ_1 q_1))
         "P-Consume"]
-   [--> (in-hole (mach Φ_1 (p_1 ... (proc (thread Σ H E (yield v)) q_1 q_2) p_2 ...)) e)
-        (in-hole (mach Φ_2 (p_1 ... (proc (thread Σ H E tick)      q_1 q_2) p_2 ...)) e)
+   
+   [--> (mach Φ_1 (p_1 ... (proc (thread Σ H e κ (yield v)) q_1 q_2) p_2 ...))
+        (mach Φ_2 (p_1 ... (proc (thread Σ H e κ tick)      q_1 q_2) p_2 ...))
         (where Φ_2 (enqueue Φ_1 q_2 v))
         "P-Yield"]
-   [--> (mach ((q Q) ...)              (p_1 ... (proc (thread Σ H (arr e_1 e_2) tick) q_1 q_2) p_2 ...))
-        (mach ((q_new mvar) (q Q) ...) (p_1 ... (proc (thread Σ H e_1 tick) q_1 q_new) (proc (thread Σ H e_2 tick) q_new q_2) p_2 ...))
+   
+   [--> (mach ((q Q) ...)              (p_1 ... (proc (thread Σ H (arr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
+        (mach ((q_new mvar) (q Q) ...) (p_1 ... (proc (thread Σ H e_1 κ tick) q_1 q_new) (proc (thread Σ H e_2 κ tick) q_new q_2) p_2 ...))
         (fresh q_new)
         "P-Spawn"]
-   [--> (mach ((q Q) ...)                 (p_1 ... (proc (thread Σ H (parr e_1 e_2) tick) q_1 q_2) p_2 ...))
-        (mach ((q_new (queue)) (q Q) ...) (p_1 ... (proc (thread Σ_1 H e_1 tick) q_1 q_new) (proc (thread Σ_2 H e_2 tick) q_new q_2) p_2 ...))
+   
+   [--> (mach ((q Q) ...)                 (p_1 ... (proc (thread Σ H (parr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
+        (mach ((q_new (queue)) (q Q) ...) (p_1 ... (proc (thread Σ_1 H e_1 κ tick) q_1 q_new) (proc (thread Σ_2 H e_2 κ tick) q_new q_2) p_2 ...))
         (fresh q_new)
         (where (Σ_1 Σ_2) (split-Σ Σ e_1 e_2))
         "P-ParSpawn"]))

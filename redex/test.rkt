@@ -45,14 +45,14 @@
 ;; Testing the thread reduction relation
 ;;
 
-(define (test-eval-exp Γ e1 e2)
+(define (test-eval-exp Σ e1 e2)
   (define (thread-exp thread)
     (match thread
-      [(list thread _ _ e _) e]))
+      [(list thread _ _ e halt _) e]))
   (test-->>∃
    Zred
-   (term (thread ,Γ () ,e1 tick))
-   (lambda (thread) (eq? e2 (thread-exp thread)))))
+   (term (thread ,Σ () ,e1 halt tick))
+   (lambda (t) (eq? e2 (thread-exp t)))))
 
 (test-eval-exp '()
                (term (if (= 10 (+ 9 1)) (+ 1 10) (- 19)))
@@ -93,7 +93,7 @@
 ;; Convert a Ziria expression and input into an initial machine configuration
 ;;
 (define (exp->mach e in)
-  (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) ((proc (thread () () ,e tick) q_1 q_2)))))
+  (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) ((proc (thread () () ,e halt tick) q_1 q_2)))))
 
 ;;
 ;; Test that running a Ziria expression with a given intput yields the specified output
