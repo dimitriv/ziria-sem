@@ -18,20 +18,18 @@
 
 \newcommand{\bnfdef}{::=}
 \newcommand{\bnfalt}{\mathrel{\mid}}
-\newcommand{\kw}[1]{\mbox{#1}}
+\newcommand{\kw}[1]{\textsf{#1}}
 \newcommand{\arr}{\mathrel{<\!\!<\!\!<}}
 \newcommand{\parr}{\mathrel{|\!\!<\!\!<\!\!<\!\!|}}
 \newcommand{\types}[3]{#1 \vdash #2 \mathrel{:} #3}
 \newcommand{\join}[2]{#1 \sqcup #2}
-\newcommand{\clos}[2]{\left<#1; #2\right>}
+\newcommand{\clos}[3]{\left<#1; #2; #3\right>}
 
-\newcommand{\thread}[4]{\left<#1; #2; #3; #4\right>}
+\newcommand{\thread}[5]{\left<#1; #2; #3; #4; #5\right>}
 \newcommand{\proc}[3]{\ll\!#1; #2; #3\!\gg}
 \newcommand{\mach}[2]{\parallel\!#1; #2\!\parallel}
 
 \newcommand{\queue}[1]{\left<#1\right>}
-\newcommand{\tctx}[5]{\thread{#1}{#2}{#3}{#4}\left[#5\right]}
-\newcommand{\mctx}[3]{\mach{#1}{#2}\left[#3\right]}
 
 \newcommand{\ox}[1]{\llbracket#1\rrbracket}
 \newcommand{\tstep}{\rightarrow}
@@ -61,10 +59,10 @@ existing Ziria language, but all syntactic categories have been collapsed into
 the single category of expressions. In exchange, the type language in
 Figure~\ref{fig:lang:type} is rather complicated.
 
-Base types, $\tau$, are as expected. Computation types, represented by $\kappa$,
+Base types, $\tau$, are as expected. Computation types, represented by $\mu$,
 are of the form $\kw{ST}~ \iota~ \alpha~ \beta$. Function arguments, of type
 $\rho$, may be of type $\tau$ or $\kw{ref}~ \tau$. Function results, $\sigma$,
-may be of type $\tau$ or $\kappa$; that is, functions may return
+may be of type $\tau$ or $\mu$; that is, functions may return
 computations. The typing context may contain values of type $\rho$ (base types
 and refs) or of type $\rho_1 \ldots \rho_n \to \sigma$ (functions). The typing
 judgment assigns expressions a type $\theta$, which may be a base type, ref
@@ -123,14 +121,14 @@ type, computation, or function.
   \iota
      & \bnfdef & \kw{C}~ \tau \\
      & \bnfalt & \kw{T} \\
-  \kappa
+  \mu
      & \bnfdef & \kw{ST}~ \iota~ \tau~ \tau~ \\
   \rho
      & \bnfdef & \tau \\
      & \bnfalt & \kw{ref}~ \tau \\
   \sigma
      & \bnfdef & \tau \\
-     & \bnfalt & \kappa \\
+     & \bnfalt & \mu \\
   \phi
      & \bnfdef & \rho \\
      & \bnfalt & \rho_1 \ldots \rho_n \to \sigma \\
@@ -140,13 +138,14 @@ type, computation, or function.
   \theta
      & \bnfdef & \tau \\
      & \bnfalt & \kw{ref}~ \tau \\
-     & \bnfalt & \kappa \\
+     & \bnfalt & \mu \\
      & \bnfalt & \rho_1 \ldots \rho_n \to \sigma
 \end{array}
 \end{equation*}
 \caption{Type language}
 \label{fig:lang:type}
 \end{figure}
+
 The base typing rules are given in Figure~\ref{type:base}. The rules for
 computations are given in Figure~\ref{type:comp}. Both monadic sequencing and
 monadic bind are including because treating sequencing as a derived form was
@@ -287,47 +286,47 @@ thus allowing for a shared heap.
 \begin{figure}
 \begin{equation*}
 \begin{array}{lcl}
-  E
-     & \bnfdef & unop~ E \\
-     & \bnfalt & E~ binop~ e \\
-     & \bnfalt & v~ binop~ E \\
-     & \bnfalt & \kw{if}~ E~ \kw{then}~ e~ \kw{else}~ e \\
-     & \bnfalt & \kw{let}~ x \mathrel{=} E~ \kw{in}~ e \\
-     & \bnfalt & f~ v_1~ \ldots~ v_{i-1}~ E~ e_{i+1}~ \ldots~ e_n \\
-     & \bnfalt & \kw{letref}~ x \mathrel{=} E~ \kw{in}~ e \\
-     & \bnfalt & x \mathrel{:=} E \\
-     & \bnfalt & \kw{return}~ E \\
-     & \bnfalt & x \mathrel{\leftarrow} E;~ e \\
-     & \bnfalt & E;~ e \\
-     & \bnfalt & \kw{emit}~ E \\
-     & \bnfalt & \cdot \\
+  \kappa
+     & \bnfdef & \kw{halt} \\
+     & \bnfalt & \kw{popk}~ \Sigma~ \kappa \\
+     & \bnfalt & \kw{unopk}~ unop~ \kappa \\
+     & \bnfalt & \kw{binop1k}~ binop~ e~ \kappa \\
+     & \bnfalt & \kw{binop2k}~ binop~ v~ \kappa  \\
+     & \bnfalt & \kw{ifk}~ e~ e~ \kappa \\
+     & \bnfalt & \kw{letk}~ x~ e~ \kappa \\
+     & \bnfalt & \kw{argk}~ f~ (v_1, \ldots, v_{i-1})~ (e_{i+1}, \ldots e_n)~ \kappa \\
+     & \bnfalt & \kw{letrefk}~ x~ e~ \kappa \\
+     & \bnfalt & \kw{setk}~ x~ \kappa \\
+     & \bnfalt & \kw{returnk}~ \kappa \\
+     & \bnfalt & \kw{bindk}~ x~ e~ \kappa \\
+     & \bnfalt & \kw{seqk}~ e~ \kappa \\
+     & \bnfalt & \kw{emitk} \\
   v
      & \bnfdef & k \\
   clos
-     & \bnfdef & \clos{x_1, \ldots, x_n}{e} \\
-  v_\sigma
-     & \bnfdef & v \\
-     & \bnfalt & \ell \\
-     & \bnfalt & clos \\
+     & \bnfdef & \clos{x_1, \ldots, x_n}{e}{\Sigma} \\
   \Sigma
      & \bnfdef & \emptyset \\
-     & \bnfalt & x = v_\sigma, \Sigma \\
+     & \bnfalt & x = \ell, \Sigma \\
+  v_H
+     & \bnfdef & v \\
+     & \bnfalt & clos \\
   H
      & \bnfdef & \emptyset \\
-     & \bnfalt & \ell = v, H \\
+     & \bnfalt & \ell = v_H, H \\
   \delta
      & \bnfdef & \kw{tick} \\
      & \bnfalt & \kw{wait} \\
      & \bnfalt & \kw{cons}~ v \\
      & \bnfalt & \kw{yield}~ v \\
   t
-     & \bnfdef & \thread{\Sigma}{H}{e}{\delta} \\
+     & \bnfdef & \thread{\Sigma}{H}{e}{\kappa}{\delta} \\
   Q
      & \bnfdef & \kw{queue}~ v \ldots \\
      & \bnfalt & \kw{mvar} \\
      & \bnfalt & \kw{mvar}~ v \\
   p
-     & \bnfdef & \proc{\thread{\Sigma}{H}{e}{\delta}}{q_i}{q_o} \\
+     & \bnfdef & \proc{\thread{\Sigma}{H}{e}{\kappa}{\delta}}{q_i}{q_o} \\
   \Phi
      & \bnfdef & \emptyset \\
      & \bnfalt & q = Q, \Phi \\
@@ -337,17 +336,16 @@ thus allowing for a shared heap.
 \label{fig:lang:context}
 \end{figure}
 
-Evaluation contexts are given in Figure~\ref{fig:lang:context}. Closures are
-represented by $clos$. Note that the semantics for function call is not
-correct---do we want proper closures or not?
+The evaluation relation is formulated as a CESK-style abstract machine, shown in
+Figure~\ref{fig:lang:context}. Closures are represented by $clos$. All values
+are heap-allocated; the store, $\Sigma$, maps variables to locations, and the
+heap, $H$, maps locations to values or closures.
 
-The store, $\Sigma$, maps variables to values, locations ($\ell$), or
-closures. The heap, $H$, maps locations to values.
-
-Threads consist of a store, a heap, an expression, and an \emph{action},
-$\delta$. This action represents the thread's interaction with the outside world
-via queues; note that threads \emph{can} share heaps, but only if the operate in
-lockstep. Otherwise all communication between threads is via queues.
+Threads consist of a store, a heap, an expression, a continuation $\kappa$, and
+an \emph{action} $\delta$. This action represents the thread's interaction with
+the outside world via queues; note that threads \emph{can} share heaps, but only
+if they operate in lockstep. Otherwise all communication between threads is via
+queues.
 
 Processes consist of a thread and two queues, an input queue and an output
 queue.
@@ -373,41 +371,92 @@ one thread can step, then the machine can step. If a thread needs to synchronize
 via its input/output queues, then the machine can step by either enqueuing or
 dequeuing values to satisfy a thread's action, $\delta$.
 
+The \rref{P-ParSpawn} rule splits the environment $\Sigma$ into two parts,
+$\Sigma_1 \oplus \Sigma_2 = \Sigma$, such that $\Sigma_1$ and $\Sigma_2$ do not
+both contain a mapping for any variable $x$ that is dereferenced by both $e_1$
+and $e_2$, respectively. The heap is not actually split, but because references
+are only introduced by $\kw{letref}$, this still ensures that parallel threads
+can only communicate through queues.
+
 \begin{figure*}
 \figurebox{
-\judgment{Thread Evaluation}{\fbox{$\thread{\Sigma_1}{H_1}{e_1}{\delta_1} \tstep \thread{\Sigma_2}{H_2}{e_2}{\delta_2}$}}
+\judgment{Thread Evaluation}
+{\fbox{$\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1} \tstep \thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}$}}
+\infax[E-PopK]
+  {\thread{\Sigma}{H}{v}{\kw{popk}~ \Sigma'~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma'}{H}{v}{\kappa}{\kw{tick}}}
+
+\infax[E-PopReturnK]
+  {\thread{\Sigma}{H}{\kw{return}~v}{\kw{popk}~ \Sigma'~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma'}{H}{\kw{return}~v}{\kappa}{\kw{tick}}}
+
 \infax[E-Var]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{x} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{\Sigma\left[x\right]}}
+  {\thread{\Sigma}{H}{x}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{v}{\kappa}{\kw{tick}}
+   \quad \mbox{where $\ell = \Sigma\left[x\right], v = H\left[\ell\right]$}}
 
 \infax[E-Unop]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{unop~ n} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{\ox{unop~n}}}
+  {\thread{\Sigma}{H}{unop~ e}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e}{\kw{unopk}~ unop~ \kappa}{\kw{tick}}}
+
+\infax[E-UnopK]
+  {\thread{\Sigma}{H}{v}{\kw{unopk}~unop~ \kappa}{\kw{tick}} \tstep
+    \thread{\Sigma}{H}{\ox{unop~v}}{\kappa}{\kw{tick}}}
 
 \infax[E-Binop]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{n_1~ binop~ n_2} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{\ox{n_1~ binop~ n_2}}}
+  {\thread{\Sigma}{H}{binop~ e_1~ e_2}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e_1}{\kw{binopk1}~ binop~ e_2~ \kappa}{\kw{tick}}}
 
-\infax[E-IfTrue]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{if}~ \kw{true}~ \kw{then}~ e_1~ \kw{else}~ e_2} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{e_1}}
+\infax[E-Binop1K]
+  {\thread{\Sigma}{H}{v_1}{\kw{binop1k}~ binop~ e_2~ \kappa}{\kw{tick}} \tstep
+    \thread{\Sigma}{H}{e_2}{\kw{binop2k}~ binop~ v_1~ \kappa}{\kw{tick}}}
 
-\infax[E-IfFalse]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{if}~ \kw{false}~ \kw{then}~ e_1~ \kw{else}~ e_2} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{e_2}}
+\infax[E-Binop2K]
+  {\thread{\Sigma}{H}{v_2}{\kw{binop2k}~ binop~ v_1~ \kappa}{\kw{tick}} \tstep
+    \thread{\Sigma}{H}{\ox{v_1~ binop~ v_2}}{\kappa}{\kw{tick}}}
+
+\infax[E-If]
+  {\thread{\Sigma}{H}{\kw{if}~ e_1~ \kw{then}~ e_2~ \kw{else}~ e_3}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e_1}{\kw{ifk}~ e_2~ e_3~ \kappa}{\kw{tick}}}
+
+\infax[E-IfTrueK]
+  {\thread{\Sigma}{H}{\kw{true}}{\kw{ifk}~ e_1~ e_2~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e_1}{\kappa}{\kw{tick}}}
+
+\infax[E-IfFalseK]
+  {\thread{\Sigma}{H}{\kw{false}}{\kw{ifk}~ e_1~ e_2~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e_2}{\kappa}{\kw{tick}}}
 
 \infax[E-Let]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{let}~ x \mathrel{=} v~ \kw{in}~ e} \tstep
-   \tctx{\Sigma\left[x \mapsto v\right]}{H}{E}{\kw{tick}}{e}}
+  {\thread{\Sigma}{H}{\kw{let}~ x = e_1~ \kw{in}~ e_2}{\kappa}{\kw{tick}}\tstep
+   \thread{\Sigma}{H}{e_1}{\kw{letk}~ x~ e_2~ \kappa}{\kw{tick}}}
+
+\infax[E-LetK]
+  {\thread{\Sigma_1}{H_1}{v}{\kw{letk}~ x~ e_2~ \kappa}{\kw{tick}}\tstep
+   \thread{\Sigma_2}{H_2}{e_2}{\kw{popk}~ \Sigma_1~ \kappa}{\kw{tick}} \\
+   \quad \mbox{where $\ell$ fresh, $\Sigma_2 = \Sigma_1\left[x \mapsto \ell\right], H_2 = H_1\left[\ell \mapsto v\right]$}}
 
 \infax[E-LetFun]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{letfun}~ f~ (x_1 : \rho_1, \ldots, x_n : \rho_n) \mathrel{=} e_1~ \kw{in}~ e_2} \tstep \\
-   \tctx{\Sigma\left[f \mapsto \clos{x_1, \ldots, x_n}{e_1}\right]}{H}{E}{\kw{tick}}{e_2}}
+  {\thread{\Sigma_1}{H_1}{\kw{letfun}~ f~ (x_1 : \rho_1, \ldots, x_n : \rho_n) \mathrel{=} e_1~ \kw{in}~ e_2}{\kappa}{\kw{tick}}\tstep
+  \thread{\Sigma_2}{H_2}{e_2}{\kw{popk}~ \Sigma_1~ \kappa}{\kw{tick}} \\
+  \quad \mbox{where $\ell$ fresh, $\Sigma_2 = \Sigma_1\left[f \mapsto \ell\right], H_2 = H_1\left[\ell \mapsto \clos{x_1, \ldots, x_n}{e_1}{\Sigma_2}\right]$}}
 
 \infax[E-Call]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{f~ v_1~ \ldots v_n} \tstep \\
-   \tctx{\Sigma\left[x_1 \mapsto v_1, \ldots, x_n \mapsto v_n\right]}{H}{E}{\kw{tick}}{e} \\
-   \textrm{where $\Sigma[f] = \clos{x_1, \ldots, x_n}{e}$}}
+  {\thread{\Sigma}{H}{v_i}{\kw{argk}~ f~ (v_1, \ldots, v_{i-1})~ (e_2, \ldots, e_n)~ \kappa}{\kw{tick}} \tstep
+    \thread{\Sigma}{H}{e_1}{\kw{argk}~ f~ ()~ (e_2, \ldots, e_n)~ \kappa}{\kw{tick}}}
+
+\infax[E-ArgK]
+  {\thread{\Sigma}{H}{v_i}{\kw{argk}~ f~ (v_1, \ldots, v_{i-1})~ (e_{i+1}, \ldots e_n)~ \kappa}{\kw{tick}} \tstep \\
+   \thread{\Sigma}{H}{e_{i+1}}{\kw{argk}~ f~ (v_1, \ldots, v_{i-1}, v_i)~ (e_{i+2}, \ldots e_n)~ \kappa}{\kw{tick}}}
+
+\infax[E-CallK]
+  {\thread{\Sigma_1}{H_1}{v_n}{\kw{argk}~ f~ (v_1, \ldots, v_{n-1})~ ()~ \kappa}{\kw{tick}} \tstep \\
+   \thread{\Sigma_2}{H_2}{e_f}{\kw{popk}~ \Sigma_1~ \kappa}{\kw{tick}} \\
+     \mbox{where $\ell_f = \Sigma_1[f], \clos{x_1, \ldots, x_n}{e_f}{\Sigma_f} = H_1[\ell_f]$} \\
+     \mbox{$\ell_1, \ldots, \ell_n$ fresh,} \\
+     \mbox{$\Sigma_2 = \Sigma_1\left[ \overline{x_i \mapsto \ell_i} \right]$} \\
+     \mbox{$H_2      = H_1\left[ \overline{\ell_i \mapsto v_i} \right]$}
+   }
 }
 \caption{Base thread evaluation relation}
 \label{fig:eval:base}
@@ -415,45 +464,76 @@ dequeuing values to satisfy a thread's action, $\delta$.
 
 \begin{figure*}
 \figurebox{
-\judgment{Thread Evaluation}{\fbox{$\thread{\Sigma_1}{H_1}{e_1}{\delta_1} \tstep \thread{\Sigma_2}{H_2}{e_2}{\delta_2}$}}
+{\fbox{$\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1} \tstep \thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}$}}
+
 \infax[E-LetRef]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{letref}~ x \mathrel{=} v~ \kw{in}~ e} \tstep \\
-   \tctx{\Sigma\left[x \mapsto \ell\right]}{H\left[\ell \mapsto v\right]}{E}{\kw{tick}}{e} \\
-   \textrm{where $\ell$ fresh}}
+  {\thread{\Sigma}{H}{\kw{letref}~ x = e_1~ \kw{in}~ e_2}{\kappa}{\kw{tick}}\tstep
+   \thread{\Sigma}{H}{e_1}{\kw{letrefk}~ x~ e_2~ \kappa}{\kw{tick}}}
+
+\infax[E-LetRefK]
+  {\thread{\Sigma_1}{H_1}{v}{\kw{letrefk}~ x~ e_2~ \kappa}{\kw{tick}}\tstep
+   \thread{\Sigma_2}{H_2}{e_2}{\kw{popk}~ \Sigma_1~ \kappa}{\kw{tick}} \\
+     \quad \mbox{where $\ell$ fresh, $\Sigma_2 = \Sigma_1\left[x \mapsto \ell\right], H_2 = H_1\left[\ell \mapsto v\right]$}}
 
 \infax[E-Deref]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{!x} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{v} \\
-   \textrm{where $\ell = \Sigma[x]$, $H[\ell] = v$}}
+  {\thread{\Sigma}{H}{!x}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{\kw{return}~ v}{\kappa}{\kw{tick}} \\
+   \textrm{where $\ell = \Sigma[x]$, $v = H[\ell]$}}
 
 \infax[E-Set]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{x \mathrel{:=} v} \tstep
-   \tctx{\Sigma}{H\left[\ell \mapsto v\right]}{E}{\kw{tick}}{\kw{return}~ ()} \\
-   \textrm{where $\ell = \Sigma[x]$}}
+  {\thread{\Sigma}{H}{x \mathrel{:=} e}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e}{\kw{setk}~ x~ \kappa}{\kw{tick}}}
+
+\infax[E-SetK]
+  {\thread{\Sigma}{H_1}{v}{\kw{setk}~ x~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H_2}{\kw{return}~ ()}{\kappa}{\kw{tick}} \\
+   \textrm{where $\ell = \Sigma\left[ x \right], H_2 = H_1\left[ \ell \mapsto v \right]$}}
+
+\infax[E-Return]
+  {\thread{\Sigma}{H}{\kw{return}~ e}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e}{\kw{returnk}~ \kappa}{\kw{tick}} \\
+   \textrm{where $e$ is not a value}}
+
+\infax[E-ReturnK]
+  {\thread{\Sigma}{H}{v}{\kw{returnk}~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{\kw{return}~ v}{\kappa}{\kw{tick}}}
 
 \infax[E-Bind]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{x \mathrel{\leftarrow} v;~ c} \tstep
-   \tctx{\Sigma[x \mapsto v]}{H}{E}{\kw{tick}}{c}}
+  {\thread{\Sigma}{H}{x \mathrel{\leftarrow} e;~ c}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e}{\kw{bindk}~ x~ c~ \kappa}{\kw{tick}}}
+
+\infax[E-BindK]
+  {\thread{\Sigma_1}{H_1}{v}{\kw{bindk}~ x~ c~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma_2}{H_2}{c}{\kappa}{\kw{tick}} \\
+   \quad \mbox{where $\ell$ fresh, $\Sigma_2 = \Sigma_1\left[x \mapsto \ell\right], H_2 = H_1\left[\ell \mapsto v\right]$}}
 
 \infax[E-Seq]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{return}~ v;~ c} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{c}}
+  {\thread{\Sigma}{H}{c_1;~ c_2}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{c_1}{\kw{seqk}~ c_2~ \kappa}{\kw{tick}}}
+
+\infax[E-SeqK]
+  {\thread{\Sigma}{H}{\kw{return}~ v}{\kw{seqk}~ c~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{c}{\kappa}{\kw{tick}}}
 
 \infax[E-TakeWait]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{take}} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{wait}}{\kw{take}}}
+  {\thread{\Sigma}{H}{\kw{take}}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{\kw{take}}{\kappa}{\kw{wait}}}
 
 \infax[E-TakeConsume]
-  {\tctx{\Sigma}{H}{E}{\kw{cons}~ v}{\kw{take}} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{return}~ v}}
+  {\thread{\Sigma}{H}{\kw{take}}{\kappa}{\kw{cons}~ v} \tstep
+   \thread{\Sigma}{H}{\kw{return}~ v}{\kappa}{\kw{tick}}}
 
 \infax[E-Emit]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{emit}~ v} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{yield}~v}{\kw{return}~ ()}}
+  {\thread{\Sigma}{H}{\kw{emit}~ e}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{e}{\kw{emitk}~ \kappa}{\kw{tick}}}
+
+\infax[E-EmitK]
+  {\thread{\Sigma}{H}{v}{\kw{emitk}~ \kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{\kw{return}~ ()}{\kappa}{\kw{yield}~ v}}
 
 \infax[E-Repeat]
-  {\tctx{\Sigma}{H}{E}{\kw{tick}}{\kw{repeat}~ c} \tstep
-   \tctx{\Sigma}{H}{E}{\kw{tick}}{c ;~ \kw{repeat}~ c}}
+  {\thread{\Sigma}{H}{\kw{repeat}~ c}{\kappa}{\kw{tick}} \tstep
+   \thread{\Sigma}{H}{c ;~ \kw{repeat}~ c}{\kappa}{\kw{tick}}}
 }
 \caption{Computation thread evaluation relation}
 \label{fig:eval:comp}
@@ -463,32 +543,32 @@ dequeuing values to satisfy a thread's action, $\delta$.
 \figurebox{
 \judgment{Machine Evaluation}{\fbox{$\mach{\Phi_1}{\proc{\thread{\Sigma_1}{H_1}{e_1}{\delta_1}}{q_{i_1}}{q_{o_1}}, \ldots} \mstep \mach{\Phi_1'}{\proc{\thread{\Sigma_1'}{H_1'}{e_1'}{\delta_1'}}{q_{i_1}'}{q_{o_1}'}, \ldots}$}}
 \infrule[P-Tick]
-  {\tctx{\Sigma_1}{H_1}{E}{\delta_1}{e_1} \tstep
-   \tctx{\Sigma_2}{H_2}{E}{\delta_2}{e_2}}
-  {\mctx{\Phi}{\ldots \proc{\thread{\Sigma_1}{H_1}{E}{\delta_1}}{q_i}{q_o} \ldots }{e_1} \mstep
-   \mctx{\Phi}{\ldots \proc{\thread{\Sigma_2}{H_2}{E}{\delta_2}}{q_i}{q_o} \ldots }{e_2}}
+  {\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1} \tstep
+   \thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}}
+  {\mach{\Phi}{\ldots \proc{\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1}}{q_i}{q_o} \ldots } \mstep
+   \mach{\Phi}{\ldots \proc{\thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}}{q_i}{q_o} \ldots }}
 
 \infax[P-Consume]
-  {\mctx{\Phi_1}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{wait}}}{q_i}{q_o} \ldots }{e} \mstep \\
-   \mctx{\Phi_2}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{cons}~ v}}{q_i}{q_o} \ldots }{e} \\
+  {\mach{\Phi_1}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{wait}}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{\Phi_2}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{cons}~ v}}{q_i}{q_o} \ldots } \\
    \text{where $(\Phi_2; v) = dequeue(\Phi_1; q_i)$}}
 
 \infax[P-Yield]
-  {\mctx{\Phi}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{yield}~ v}}{q_i}{q_o} \ldots }{e} \mstep \\
-   \mctx{enqueue(\Phi; q_o; v)}{\ldots \proc{\thread{\Sigma}{H}{E}{\kw{tick}}}{q_i}{q_o} \ldots }{e}}
+  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{yield}~ v}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{enqueue(\Phi; q_o; v)}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots }}
 
 \infax[P-Spawn]
-  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
+  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
    \mach{q = \kw{mvar}, \Phi}
-   {\ldots \proc{\thread{\Sigma}{H}{e_1}{\kw{tick}}}{q_i}{q},
-     \proc{\thread{\Sigma}{H}{e_1}{\kw{tick}}}{q}{q_o} \ldots} \\
+   {\ldots \proc{\thread{\Sigma}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
+     \proc{\thread{\Sigma}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
    \text{where $q$ fresh}}
 
 \infax[P-ParSpawn]
-  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
+  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
    \mach{q = \kw{queue}, \Phi}
-   {\ldots \proc{\thread{\Sigma_1}{H}{e_1}{\kw{tick}}}{q_i}{q},
-     \proc{\thread{\Sigma_2}{H}{e_1}{\kw{tick}}}{q}{q_o} \ldots} \\
+   {\ldots \proc{\thread{\Sigma_1}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
+     \proc{\thread{\Sigma_2}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
    \text{where $q$ fresh, $\Sigma_1 \oplus \Sigma_2 = \Sigma$}}
 }
 \caption{Machine evaluation relation}
