@@ -20,7 +20,6 @@
 \newcommand{\bnfalt}{\mathrel{\mid}}
 \newcommand{\kw}[1]{\textsf{#1}}
 \newcommand{\arr}{\mathrel{<\!\!<\!\!<}}
-\newcommand{\parr}{\mathrel{|\!\!<\!\!<\!\!<\!\!|}}
 \newcommand{\types}[3]{#1 \vdash #2 \mathrel{:} #3}
 \newcommand{\join}[2]{#1 \sqcup #2}
 \newcommand{\clos}[3]{\left<#1; #2; #3\right>}
@@ -90,7 +89,6 @@ type, computation, or function.
      & \bnfalt & \kw{emit}~ e \\
      & \bnfalt & \kw{repeat}~ c \\
      & \bnfalt & c \arr c \\
-     & \bnfalt & c \parr c \\
   k
      & \bnfdef & () \\
      & \bnfalt & \kw{true} \\
@@ -150,16 +148,7 @@ The base typing rules are given in Figure~\ref{type:base}. The rules for
 computations are given in Figure~\ref{type:comp}. Both monadic sequencing and
 monadic bind are including because treating sequencing as a derived form was
 slightly more complicated in Redex---it was easier not to generate a fresh
-variable for the binding. Notice that $\kw{map}$ has been removed. The treatment
-of $\arr$ and $\parr$ is also slightly different from the old formulation;
-$\arr$ is \emph{sequential} transformer composition, and $\parr$ is
-\emph{parallelizable} transformer composition. We may want all transformer
-composition to be parallelizable in the surface language, where $\parr$ serves
-only as an annotation indicating to the compiler that it should run the compose
-transformers in separate threads, but I've kept the distinction in the core
-language. Note that we only split the typing context for $\parr$; the intent is
-that serial transformer composition spawns two threads that operate in lockstep,
-thus allowing for a shared heap.
+variable for the binding. Notice that $\kw{map}$ has been removed.
 
 \begin{figure*}
 \figurebox{
@@ -256,15 +245,10 @@ thus allowing for a shared heap.
   {\types{\Gamma}{\kw{repeat}~ c}{\kw{ST}~ \kw{T}~ \alpha~ \beta}}
 
 \infrule[T-Arr]
-  {\types{\Gamma}{c_1}{\kw{ST}~ \iota_1~ \alpha~ \beta} \\
-   \types{\Gamma}{c_2}{\kw{ST}~ \iota_2~ \alpha~ \beta}}
-  {\types{\Gamma}{c_1 \arr c_2}{\kw{ST}~ (\join{\iota_1}{\iota_2})~ \alpha~ \beta}}
-
-\infrule[T-PArr]
   {\Gamma_1 \oplus \Gamma_2 = \Gamma \\
    \types{\Gamma_1}{c_1}{\kw{ST}~ \iota_1~ \alpha~ \beta} \\
    \types{\Gamma_2}{c_2}{\kw{ST}~ \iota_2~ \alpha~ \beta}}
-  {\types{\Gamma}{c_1 \parr c_2}{\kw{ST}~ (\join{\iota_1}{\iota_2})~ \alpha~ \beta}}
+  {\types{\Gamma}{c_1 \arr c_2}{\kw{ST}~ (\join{\iota_1}{\iota_2})~ \alpha~ \beta}}
 \end{multicols}
 }
 \caption{Computation typing rules}
@@ -323,8 +307,6 @@ thus allowing for a shared heap.
      & \bnfdef & \thread{\Sigma}{H}{e}{\kappa}{\delta} \\
   Q
      & \bnfdef & \kw{queue}~ v \ldots \\
-     & \bnfalt & \kw{mvar} \\
-     & \bnfalt & \kw{mvar}~ v \\
   p
      & \bnfdef & \proc{\thread{\Sigma}{H}{e}{\kappa}{\delta}}{q_i}{q_o} \\
   \Phi
@@ -351,11 +333,8 @@ Processes consist of a thread and two queues, an input queue and an output
 queue.
 
 \emph{Machines} consist of a ``queue heap,'' $\Phi$, that maps queue locations
-$q$ to queues, and a collection of processes. Queues may be proper queues, which
-can contain zero or more values, denoted by $\kw{queue}$, or message boxes,
-which may contain zero or one value, denoted by $\kw{mvar}$. Sequential
-transformer composition synchronizes on message boxes, and parallel transformer
-composition synchronizes on proper queues.
+$q$ to queues, and a collection of processes. Queues can contain zero or more
+values.
 
 Evaluation is specified in the form of two small-step relations, one for
 threads, and one for machines. Figure~\ref{fig:eval:base} and
@@ -559,13 +538,6 @@ can only communicate through queues.
 
 \infax[P-Spawn]
   {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
-   \mach{q = \kw{mvar}, \Phi}
-   {\ldots \proc{\thread{\Sigma}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
-     \proc{\thread{\Sigma}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
-   \text{where $q$ fresh}}
-
-\infax[P-ParSpawn]
-  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
    \mach{q = \kw{queue}, \Phi}
    {\ldots \proc{\thread{\Sigma_1}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
      \proc{\thread{\Sigma_2}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
@@ -580,12 +552,8 @@ can only communicate through queues.
 \begin{align*}
 dequeue(\ldots, q = \kw{queue}~ v_1~ v_2~ \ldots, \ldots)
   &= (\ldots, q = \kw{queue}~ v_2~ \ldots, \ldots; v_1) \\
-dequeue(\ldots, q = \kw{mvar}~ v, \ldots)
-  &= (\ldots, q =\kw{mvar}, \ldots; v) \\ \\
 enqueue(\ldots, q = \kw{queue}~ v_1 \ldots, \ldots; q; v)
-  &= \ldots, q = \kw{queue}~ v_1 \ldots~ v, \ldots \\
-enqueue(\ldots, q = \kw{mvar}~, \ldots; q; v)
-  &= \ldots, q = \kw{mvar}~ v, \ldots
+  &= \ldots, q = \kw{queue}~ v_1 \ldots~ v, \ldots
 \end{align*}
 }
 \caption{Definition of the $dequeue$ and $enqueue$ functions}

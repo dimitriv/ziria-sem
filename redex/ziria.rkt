@@ -21,8 +21,7 @@
            take
            (emit e)
            (repeat e)
-           (arr e e)
-           (parr e e)]
+           (arr e e)]
   [k ::= ()
          true
          false
@@ -108,8 +107,6 @@
   [(ref-vars (repeat e))
    (ref-vars e)]
   [(ref-vars (arr e_1 e_2))
-   (∪ (ref-vars e_1) (ref-vars e_2))]
-  [(ref-vars (parr e_1 e_2))
    (∪ (ref-vars e_1) (ref-vars e_2))])
 
 ;;
@@ -262,16 +259,11 @@
    ------------------------------- "T-Repeat"
    (types Γ (repeat c) (ST T α β))]
   
-  [(types Γ c_1 (ST ι_1 α β)) (types Γ c_2 (ST ι_2 β γ))
-   (where ι_3 (join ι_1 ι_2))
-   ----------------------------------------------------- "T-Arr"
-   (types Γ (arr c_1 c_2) (ST ι_3 α γ))]
-  
   [(where (Γ_1 Γ_2) (split-Γ Γ c_1 c_2))
    (types Γ_1 c_1 (ST ι_1 α β)) (types Γ_2 c_2 (ST ι_2 β γ))
    (where ι_3 (join ι_1 ι_2))
-   ----------------------------------------------------------- "T-PArr"
-   (types Γ (parr c_1 c_2) (ST ι_3 α γ))])
+   ----------------------------------------------------------- "T-Arr"
+   (types Γ (arr c_1 c_2) (ST ι_3 α γ))])
 
 (define-metafunction Z
   unop-type : unop -> (θ θ)
@@ -351,9 +343,7 @@
   ;; Threads
   [t ::= (thread Σ H e κ δ)]
   ;; Queues
-  [Q I O ::= (queue v ...)
-             mvar
-             (mvar v)]
+  [Q I O ::= (queue v ...)]
   ;; Process
   [p ::= (proc t q_1 q_2)]
   ;; Queue heap
@@ -586,27 +576,20 @@
         (where Φ_2 (enqueue Φ_1 q_2 v))
         "P-Yield"]
    
-   [--> (mach ((q Q) ...)              (p_1 ... (proc (thread Σ H (arr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
-        (mach ((q_new mvar) (q Q) ...) (p_1 ... (proc (thread Σ H e_1 κ tick) q_1 q_new) (proc (thread Σ H e_2 κ tick) q_new q_2) p_2 ...))
-        (fresh q_new)
-        "P-Spawn"]
-   
-   [--> (mach ((q Q) ...)                 (p_1 ... (proc (thread Σ H (parr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
+   [--> (mach ((q Q) ...)                 (p_1 ... (proc (thread Σ H (arr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
         (mach ((q_new (queue)) (q Q) ...) (p_1 ... (proc (thread Σ_1 H e_1 κ tick) q_1 q_new) (proc (thread Σ_2 H e_2 κ tick) q_new q_2) p_2 ...))
         (fresh q_new)
         (where (Σ_1 Σ_2) (split-Σ Σ e_1 e_2))
-        "P-ParSpawn"]))
+        "P-Spawn"]))
 
 (define-metafunction Zv
   dequeue : Φ q -> (Φ v) or #f
   [(dequeue ((q_1 Q_1) ... (q (queue v_1 v ...)) (q_2 Q_2) ...) q) (((q_1 Q_1) ... (q (queue v ...)) (q_2 Q_2) ...) v_1)]
-  [(dequeue ((q_1 Q_1) ... (q (mvar v))          (q_2 Q_2) ...) q) (((q_1 Q_1) ... (q mvar)          (q_2 Q_2) ...) v)]
   [(dequeue Φ q) #f])
 
 (define-metafunction Zv
   enqueue : Φ q v -> Φ or #f
   [(enqueue ((q_1 Q_1) ... (q (queue v_1 ...)) (q_2 Q_2) ...) q v) ((q_1 Q_1) ... (q (queue v_1 ... v)) (q_2 Q_2) ...)]
-  [(enqueue ((q_1 Q_1) ... (q mvar)            (q_2 Q_2) ...) q v) ((q_1 Q_1) ... (q (mvar v))          (q_2 Q_2) ...)]
   [(enqueue Φ q v) #f])
 
 ;;

@@ -80,13 +80,12 @@
 ;;
 
 (define-syntax do
-  (syntax-rules (let letref letfun <- >>> ∥>>>∥)
+  (syntax-rules (let letref letfun <- >>>)
     [(_ let x e rest ...) (term (let x e ,(do rest ...)))]
     [(_ letref x e rest ...) (term (letref x e ,(do rest ...)))]
     [(_ letfun f args e rest ...) (term (letfun f args e ,(do rest ...)))]
     [(_ e) (term e)]
     [(_ e1 >>> e2) (term (arr ,e1 ,e2))]
-    [(_ e1 ∥>>>∥ e2) (term (parr ,e1 ,e2))]
     [(_ v <- e rest ...)
      (term (bind v ,(do e) ,(do rest ...)))]
     [(_ e rest ...)
@@ -135,7 +134,7 @@
                          (emit z1)
                          (emit z2)
                          (set x (+ z1 z2)))))
-      ∥>>>∥
+      >>>
       (term (repeat ,(do z <- take
                          (emit z))))))
 
@@ -158,7 +157,7 @@
                          (emit z1)
                          (emit z2)
                          (set x (+ z1 z2)))))
-      ∥>>>∥
+      >>>
       (do z <- take
           (set x z)
           (emit z))))
