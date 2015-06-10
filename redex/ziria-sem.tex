@@ -61,10 +61,10 @@ Figure~\ref{fig:lang:type} is rather complicated.
 Base types, $\tau$, are as expected. Computation types, represented by $\mu$,
 are of the form $\kw{ST}~ \iota~ \alpha~ \beta$. Function arguments, of type
 $\rho$, may be of type $\tau$ or $\kw{ref}~ \tau$. Function results, $\sigma$,
-may be of type $\tau$ or $\mu$; that is, functions may return
-computations. The typing context may contain values of type $\rho$ (base types
-and refs) or of type $\rho_1 \ldots \rho_n \to \sigma$ (functions). The typing
-judgment assigns expressions a type $\theta$, which may be a base type, ref
+may be of type $\tau$ or $\mu$; that is, functions may return computations. The
+typing context may contain values of the form $\rho$ (base types and \kw{ref}s)
+or $\rho_1 \ldots \rho_n \to \sigma$ (functions). The typing judgment assigns
+expressions a type of the form $\theta$, which may be a base type, \kw{ref}
 type, computation, or function.
 
 \begin{figure}
@@ -146,9 +146,16 @@ type, computation, or function.
 
 The base typing rules are given in Figure~\ref{type:base}. The rules for
 computations are given in Figure~\ref{type:comp}. Both monadic sequencing and
-monadic bind are including because treating sequencing as a derived form was
+monadic bind are included because treating sequencing as a derived form was
 slightly more complicated in Redex---it was easier not to generate a fresh
 variable for the binding. Notice that $\kw{map}$ has been removed.
+
+\subsection{Context splitting and heap splitting}
+
+The context splitting operation $\oplus$ only splits the portion of the context
+that contains variables that have type $\kw{ref}~ \tau$; the rest of the context
+may be shared. The reduction semantics \emph{does not} split the heap; a
+well-typed program will not share \kw{ref} values between different threads.
 
 \begin{figure*}
 \figurebox{
@@ -323,18 +330,13 @@ Figure~\ref{fig:lang:context}. Closures are represented by $clos$. All values
 are heap-allocated; the store, $\Sigma$, maps variables to locations, and the
 heap, $H$, maps locations to values or closures.
 
-Threads consist of a store, a heap, an expression, a continuation $\kappa$, and
-an \emph{action} $\delta$. This action represents the thread's interaction with
-the outside world via queues; note that threads \emph{can} share heaps, but only
-if they operate in lockstep. Otherwise all communication between threads is via
-queues.
-
-Processes consist of a thread and two queues, an input queue and an output
-queue.
-
-\emph{Machines} consist of a ``queue heap,'' $\Phi$, that maps queue locations
-$q$ to queues, and a collection of processes. Queues can contain zero or more
-values.
+\emph{Threads} $t$ consist of a store, a heap, an expression, a continuation
+$\kappa$, and an \emph{action} $\delta$. This action represents the thread's
+interaction with the outside world via queues. \emph{Processes} $p$ consist of a
+thread and two queues, an input queue and an output queue. \emph{Machines}
+$\mach{\Phi}{p_1,\ldots,p_n}$ consist of a ``queue heap,'' $\Phi$, that maps
+queue locations $q$ to queues, and a collection of processes. Queues can contain
+zero or more values.
 
 Evaluation is specified in the form of two small-step relations, one for
 threads, and one for machines. Figure~\ref{fig:eval:base} and
@@ -349,13 +351,6 @@ The evaluation relation for machines is given in Figure~\ref{fig:eval:mach}. If
 one thread can step, then the machine can step. If a thread needs to synchronize
 via its input/output queues, then the machine can step by either enqueuing or
 dequeuing values to satisfy a thread's action, $\delta$.
-
-The \rref{P-ParSpawn} rule splits the environment $\Sigma$ into two parts,
-$\Sigma_1 \oplus \Sigma_2 = \Sigma$, such that $\Sigma_1$ and $\Sigma_2$ do not
-both contain a mapping for any variable $x$ that is dereferenced by both $e_1$
-and $e_2$, respectively. The heap is not actually split, but because references
-are only introduced by $\kw{letref}$, this still ensures that parallel threads
-can only communicate through queues.
 
 \begin{figure*}
 \figurebox{
@@ -539,9 +534,9 @@ can only communicate through queues.
 \infax[P-Spawn]
   {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
    \mach{q = \kw{queue}, \Phi}
-   {\ldots \proc{\thread{\Sigma_1}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
-     \proc{\thread{\Sigma_2}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
-   \text{where $q$ fresh, $\Sigma_1 \oplus \Sigma_2 = \Sigma$}}
+   {\ldots \proc{\thread{\Sigma}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
+     \proc{\thread{\Sigma}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
+   \text{where $q$ fresh}}
 }
 \caption{Machine evaluation relation}
 \label{fig:eval:mach}

@@ -532,22 +532,6 @@
   [(meta-binop *   number_1 number_2) ,(apply * (term (number_1 number_2)))]
   [(meta-binop div number_1 number_2) ,(apply quotient (term (number_1 number_2)))])
 
-(define-metafunction Zv
-  split-Σ : Σ e e -> (Σ Σ)
-  [(split-Σ () e_1 e_2)
-   (() ())]
-  [(split-Σ ((x_1 l_1) (x_2 l_2) ...) e_1 e_2)
-   (((x_1 l_1) . Σ_1) Σ_2)
-   (where (Σ_1 Σ_2) (split-Σ ((x_2 l_2) ...) e_1 e_2))
-   (side-condition (term (∈ x_1 (ref-vars e_1))))]
-  [(split-Σ ((x_1 l_1) (x_2 l_2) ...) e_1 e_2)
-   (Σ_1 ((x_1 l_1) . Σ_2))
-   (where (Σ_1 Σ_2) (split-Σ ((x_2 l_2) ...) e_1 e_2))
-   (side-condition (term (∈ x_1 (ref-vars e_2))))]
-  [(split-Σ ((x_1 l_1) (x_2 l_2) ...) e_1 e_2)
-   (((x_1 l_1) . Σ_1) ((x_1 l_1) . Σ_2))
-   (where (Σ_1 Σ_2) (split-Σ ((x_2 l_2) ...) e_1 e_2))])
-
 (define-judgment-form
   Zv
   #:mode (→z I O)
@@ -577,9 +561,8 @@
         "P-Yield"]
    
    [--> (mach ((q Q) ...)                 (p_1 ... (proc (thread Σ H (arr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
-        (mach ((q_new (queue)) (q Q) ...) (p_1 ... (proc (thread Σ_1 H e_1 κ tick) q_1 q_new) (proc (thread Σ_2 H e_2 κ tick) q_new q_2) p_2 ...))
+        (mach ((q_new (queue)) (q Q) ...) (p_1 ... (proc (thread Σ H e_1 κ tick) q_1 q_new) (proc (thread Σ H e_2 κ tick) q_new q_2) p_2 ...))
         (fresh q_new)
-        (where (Σ_1 Σ_2) (split-Σ Σ e_1 e_2))
         "P-Spawn"]))
 
 (define-metafunction Zv
