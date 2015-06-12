@@ -103,13 +103,14 @@
 ;; Test that running a Ziria expression with a given intput yields the specified output
 ;;
 (define (test-output e in out)
-  (define (mach-output m)
+  (define (mach-output-matches? m)
     (match m
-      [(list 'mach (list _ ... (list _ (list 'queue v ...))) _) v]))
+      [`(mach (,_ ... (,_ (queue ,v ...))) ,_) (equal? out v)]
+      [_ #f]))
   (test-->>∃
    Zmach
    (exp->mach e in)
-   (lambda (m) (equal? (mach-output m) out))))
+   mach-output-matches?))
 
 (define pipe
   (term (repeat ,(do x <- take
