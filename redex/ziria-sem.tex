@@ -478,7 +478,7 @@ dequeuing values to satisfy a thread's action, $\delta$.
 
 \infax[E-BindK]
   {\thread{\Sigma_1}{H_1}{v}{\kw{bindk}~ x~ c~ \kappa}{\kw{tick}} \tstep
-   \thread{\Sigma_2}{H_2}{c}{\kappa}{\kw{tick}} \\
+   \thread{\Sigma_2}{H_2}{c}{\kw{popk}~ \Sigma_1~ \kappa}{\kw{tick}} \\
    \quad \mbox{where $\ell$ fresh, $\Sigma_2 = \Sigma_1\left[x \mapsto \ell\right], H_2 = H_1\left[\ell \mapsto v\right]$}}
 
 \infax[E-Seq]
