@@ -102,7 +102,7 @@
 ;;
 ;; Test that running a Ziria expression with a given intput yields the specified output
 ;;
-(define (test-output e in out)
+(define (test-exists e in out)
   (define (mach-output-matches? m)
     (match m
       [`(mach (,_ ... (,_ (queue ,v ...))) ,_ ,_) (equal? out v)]
@@ -112,6 +112,22 @@
    (exp->mach e in)
    mach-output-matches?))
 
+;;
+;; Test that running a Ziria expression with a given intput reduces to a final
+;; state with the specified final input and output
+;;
+(define (test-final e in in-fin out-fin)
+  (define (mach-in-out-matches? m)
+    (match m
+      [`(mach (,_ ... (,_ (queue ,v_in ...)) (,_ (queue ,v_out ...))) ,_ ,_)
+       (and (equal? in-fin  v_in)
+            (equal? out-fin v_out))]
+      [_ #f]))
+  (for-each (lambda (m) (test-predicate mach-in-out-matches? m))
+            (apply-reduction-relation* Zmach
+                                       (exp->mach e in)
+                                       #:cache-all? #t)))
+
 (define pipe
   (term (repeat ,(do x <- take
                      (emit x)))))
@@ -120,9 +136,10 @@
   (term (repeat ,(do x <- take
                      (emit (,f x))))))
 
-(test-output (do letfun f ((x : int)) (+ x 1)
+(test-final (do letfun f ((x : int)) (+ x 1)
                  ,(map 'f))
              '(1 2 3 4 5)
+             '()
              '(2 3 4 5 6))
 
 ;;
@@ -144,8 +161,9 @@
   (types () ,test (ST T int int)))
  #t)
 
-(test-output test
+(test-final test
              '(1 2)
+             '()
              '(0 1 1 2))
 
 ;;
@@ -177,8 +195,9 @@
       (do x <- take
           (emit x))))
 
-(test-output test-not-eager
+(test-final test-not-eager
              '(1 2 3)
+             '(2 3)
              '(1))
 
 ;;(traces Zmach (exp->mach pipe '(1 2)))
