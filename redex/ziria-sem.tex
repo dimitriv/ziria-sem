@@ -59,7 +59,7 @@ the single category of expressions. In exchange, the type language in
 Figure~\ref{fig:lang:type} is rather complicated.
 
 Base types, $\tau$, are as expected. Computation types, represented by $\mu$,
-are of the form $\kw{ST}~ \iota~ \alpha~ \beta$. Function arguments, of type
+are of the form $\kw{ST}~ \omega~ \alpha~ \beta$. Function arguments, of type
 $\rho$, may be of type $\tau$ or $\kw{ref}~ \tau$. Function results, $\sigma$,
 may be of type $\tau$ or $\mu$; that is, functions may return computations. The
 typing context may contain values of the form $\rho$ (base types and \kw{ref}s)
@@ -116,11 +116,11 @@ type, computation, or function.
      & \bnfdef & () \\
      & \bnfalt & \kw{bool} \\
      & \bnfalt & \kw{int} \\
-  \iota
+  \omega
      & \bnfdef & \kw{C}~ \tau \\
      & \bnfalt & \kw{T} \\
   \mu
-     & \bnfdef & \kw{ST}~ \iota~ \tau~ \tau~ \\
+     & \bnfdef & \kw{ST}~ \omega~ \tau~ \tau~ \\
   \rho
      & \bnfdef & \tau \\
      & \bnfalt & \kw{ref}~ \tau \\
@@ -215,8 +215,8 @@ well-typed program will not share \kw{ref} values between different threads.
 \begin{multicols}{2}[\judgment{Typing Relation}{\fbox{$\types{\Gamma}{e}{\theta}$}}]
 \infrule[T-LetRef]
   {\types{\Gamma}{e_1}{\tau_1} \andalso
-    \types{x : \kw{ref}~ \tau_1, \Gamma}{e_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
-  {\types{\Gamma}{\kw{letref}~ x \mathrel{=} e_1~ \kw{in}~ e_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+    \types{x : \kw{ref}~ \tau_1, \Gamma}{e_2}{\kw{ST}~ \omega~ \alpha~ \beta}}
+  {\types{\Gamma}{\kw{letref}~ x \mathrel{=} e_1~ \kw{in}~ e_2}{\kw{ST}~ \omega~ \alpha~ \beta}}
 
 \infrule[T-Deref]
   {x:\kw{ref}~ \tau \in \Gamma}
@@ -232,13 +232,13 @@ well-typed program will not share \kw{ref} values between different threads.
 
 \infrule[T-Bind]
   {\types{\Gamma}{c_1}{\kw{ST}~ (\kw{C}~ \nu)~ \alpha~ \beta} \andalso
-   \types{x : \nu, \Gamma}{c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
-  {\types{\Gamma}{x \mathrel{\leftarrow} c_1;~ c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+   \types{x : \nu, \Gamma}{c_2}{\kw{ST}~ \omega~ \alpha~ \beta}}
+  {\types{\Gamma}{x \mathrel{\leftarrow} c_1;~ c_2}{\kw{ST}~ \omega~ \alpha~ \beta}}
 
 \infrule[T-Seq]
   {\types{\Gamma}{c_1}{\kw{ST}~ (\kw{C}~ \nu)~ \alpha~ \beta} \andalso
-   \types{x\Gamma}{c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
-  {\types{\Gamma}{c_1;~ c_2}{\kw{ST}~ \iota~ \alpha~ \beta}}
+   \types{x\Gamma}{c_2}{\kw{ST}~ \omega~ \alpha~ \beta}}
+  {\types{\Gamma}{c_1;~ c_2}{\kw{ST}~ \omega~ \alpha~ \beta}}
 
 \infax[T-Take]
   {\types{\Gamma}{\kw{take}}{\kw{ST}~ (\kw{C}~ \alpha)~ \alpha~ \beta}}
@@ -253,9 +253,9 @@ well-typed program will not share \kw{ref} values between different threads.
 
 \infrule[T-Arr]
   {\Gamma_1 \oplus \Gamma_2 = \Gamma \\
-   \types{\Gamma_1}{c_1}{\kw{ST}~ \iota_1~ \alpha~ \beta} \\
-   \types{\Gamma_2}{c_2}{\kw{ST}~ \iota_2~ \alpha~ \beta}}
-  {\types{\Gamma}{c_1 \arr c_2}{\kw{ST}~ (\join{\iota_1}{\iota_2})~ \alpha~ \beta}}
+   \types{\Gamma_1}{c_1}{\kw{ST}~ \omega_1~ \alpha~ \beta} \\
+   \types{\Gamma_2}{c_2}{\kw{ST}~ \omega_2~ \alpha~ \beta}}
+  {\types{\Gamma}{c_1 \arr c_2}{\kw{ST}~ (\join{\omega_1}{\omega_2})~ \alpha~ \beta}}
 \end{multicols}
 }
 \caption{Computation typing rules}

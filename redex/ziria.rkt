@@ -38,9 +38,9 @@
   [α β γ ν τ ::= unit
                  bool
                  int]
-  [ι (C τ)
+  [ω (C τ)
      T]
-  [μ (ST ι τ τ)]
+  [μ (ST ω τ τ)]
   [ρ ::= τ
          (ref τ)]
   [σ ::= τ
@@ -232,9 +232,9 @@
   ;;
   
   [(types Γ e_1 τ_1)
-   (types ((x (ref τ_1)) . Γ) e_2 (ST ι α β))
+   (types ((x (ref τ_1)) . Γ) e_2 (ST ω α β))
    ------------------------------------------- "T-LetRef"
-   (types Γ (letref x e_1 e_2) (ST ι α β))]
+   (types Γ (letref x e_1 e_2) (ST ω α β))]
   
   [(types Γ x (ref τ)) (base-type α) (base-type β)
    ----------------------------------------------- "T-Deref"
@@ -249,13 +249,13 @@
    ----------------------------------------- "T-Return"
    (types Γ (return e) (ST (C τ) α β))]
   
-  [(types Γ c_1 (ST (C ν) α β)) (types ((x ν) . Γ) c_2 (ST ι α β))
+  [(types Γ c_1 (ST (C ν) α β)) (types ((x ν) . Γ) c_2 (ST ω α β))
    ----------------------------------------------------------------- "T-Bind"
-  (types Γ (bind x c_1 c_2) (ST ι α β))]
+  (types Γ (bind x c_1 c_2) (ST ω α β))]
   
-  [(types Γ c_1 (ST (C ν) α β)) (types Γ c_2 (ST ι α β))
+  [(types Γ c_1 (ST (C ν) α β)) (types Γ c_2 (ST ω α β))
    ----------------------------------------------------- "T-Seq"
-   (types Γ (seq c_1 c_2) (ST ι α β))]
+   (types Γ (seq c_1 c_2) (ST ω α β))]
   
   [(base-type α) (base-type β)
    ----------------------------- "T-Take"
@@ -270,10 +270,10 @@
    (types Γ (repeat c) (ST T α β))]
   
   [(where (Γ_1 Γ_2) (split-Γ Γ c_1 c_2))
-   (types Γ_1 c_1 (ST ι_1 α β)) (types Γ_2 c_2 (ST ι_2 β γ))
-   (where ι_3 (join ι_1 ι_2))
+   (types Γ_1 c_1 (ST ω_1 α β)) (types Γ_2 c_2 (ST ω_2 β γ))
+   (where ω_3 (join ω_1 ω_2))
    ----------------------------------------------------------- "T-Arr"
-   (types Γ (arr c_1 c_2) (ST ι_3 α γ))])
+   (types Γ (arr c_1 c_2) (ST ω_3 α γ))])
 
 (define-metafunction Z
   unop-type : unop -> (θ θ)
@@ -290,7 +290,7 @@
   [(binop-type div) (int int int)])
 
 (define-metafunction Z
-  join : ι ι -> ι
+  join : ω ω -> ω
   [(join (C ν) T) (C ν)]
   [(join T (C ν)) (C ν)]
   [(join T T)     T])
