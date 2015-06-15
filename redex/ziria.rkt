@@ -147,6 +147,16 @@
   [(∈ x_1 (x_1 x ...)) #t]
   [(∈ x_1 (x_2 x ...)) (∈ x_1 (x ...))])
 
+;;
+;; Set deletion
+;;
+(define-metafunction Z
+  delete : x (x ...) -> (x ...)
+  [(delete x   ())          ()]
+  [(delete x_1 (x_1 x ...)) (delete x_1 (x ...))]
+  [(delete x_1 (x_2 x ...)) (x_2 x_3 ...)
+                            (where (x_3 ...) (delete x_1 (x ...)))])
+
 (define-judgment-form
   Z
   #:mode (base-type O)
@@ -348,8 +358,10 @@
   [p ::= (proc t q_1 q_2)]
   ;; Queue heap
   [Φ ::= ((q Q) ...)]
+  ;; Queue wait set
+  [X ::= (q ...)]
   ;; Machines
-  [m ::= (mach Φ (p ...))]
+  [m ::= (mach Φ X (p ...))]
   )
 
 (define Zred
@@ -545,25 +557,48 @@
   (reduction-relation
    Zv
    #:domain m
-   [--> (mach Φ (p_1 ... (proc (thread Σ_1 H_1 e_1 κ_1 δ_1) q_1 q_2) p_2 ...))
-        (mach Φ (p_1 ... (proc (thread Σ_2 H_2 e_2 κ_2 δ_2) q_1 q_2) p_2 ...))
+   [--> (mach Φ X (p_1 ... (proc (thread Σ_1 H_1 e_1 κ_1 δ_1) q_1 q_2) p_2 ...))
+        (mach Φ X (p_1 ... (proc (thread Σ_2 H_2 e_2 κ_2 δ_2) q_1 q_2) p_2 ...))
         (judgment-holds (→z (thread Σ_1 H_1 e_1 κ_1 δ_1) (thread Σ_2 H_2 e_2 κ_2 δ_2)))
         "P-Tick"]
    
-   [--> (mach Φ_1 (p_1 ... (proc (thread Σ H e κ wait)     q_1 q_2) p_2 ...))
-        (mach Φ_2 (p_1 ... (proc (thread Σ H e κ (cons v)) q_1 q_2) p_2 ...))
+   [--> (mach Φ X_1 (p_1 ... (proc (thread Σ H e κ wait) q_1 q_2) p_2 ...))
+        (mach Φ X_2 (p_1 ... (proc (thread Σ H e κ wait) q_1 q_2) p_2 ...))
+        (side-condition (term (∈ q_2 X_1)))
+        (where #f (dequeue Φ q_1))
+        (side-condition (not (term (∈ q_1 X_1))))
+        (where (q ...) X_1)
+        (where X_2     (q_1 q ...))
+        "P-Wait"]
+   
+   [--> (mach Φ_1 X (p_1 ... (proc (thread Σ H e κ wait)     q_1 q_2) p_2 ...))
+        (mach Φ_2 X (p_1 ... (proc (thread Σ H e κ (cons v)) q_1 q_2) p_2 ...))
+        (side-condition (term (∈ q_2 X)))
         (where (Φ_2 v) (dequeue Φ_1 q_1))
         "P-Consume"]
    
-   [--> (mach Φ_1 (p_1 ... (proc (thread Σ H e κ (yield v)) q_1 q_2) p_2 ...))
-        (mach Φ_2 (p_1 ... (proc (thread Σ H e κ tick)      q_1 q_2) p_2 ...))
+   [--> (mach Φ_1 X (p_1 ... (proc (thread Σ H e κ (yield v)) q_1 q_2) p_2 ...))
+        (mach Φ_2 X (p_1 ... (proc (thread Σ H e κ tick)      q_1 q_2) p_2 ...))
+        (side-condition (term (isout Φ_1 q_2)))
+        (where Φ_2 (enqueue Φ_1 q_2 v))
+        "P-YieldOut"]
+   
+   [--> (mach Φ_1 X_1 (p_1 ... (proc (thread Σ H e κ (yield v)) q_1 q_2) p_2 ...))
+        (mach Φ_2 X_2 (p_1 ... (proc (thread Σ H e κ tick)      q_1 q_2) p_2 ...))
+        (side-condition (not (term (isout Φ_1 q_2))))
+        (where X_2 (delete q_2 X_1))
         (where Φ_2 (enqueue Φ_1 q_2 v))
         "P-Yield"]
    
-   [--> (mach ((q Q) ...)                 (p_1 ... (proc (thread Σ H (arr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
-        (mach ((q_new (queue)) (q Q) ...) (p_1 ... (proc (thread Σ H e_1 κ tick) q_1 q_new) (proc (thread Σ H e_2 κ tick) q_new q_2) p_2 ...))
+   [--> (mach ((q Q) ...)                 X (p_1 ... (proc (thread Σ H (arr e_1 e_2) κ tick) q_1 q_2) p_2 ...))
+        (mach ((q_new (queue)) (q Q) ...) X (p_1 ... (proc (thread Σ H e_1 κ tick) q_1 q_new) (proc (thread Σ H e_2 κ tick) q_new q_2) p_2 ...))
         (fresh q_new)
         "P-Spawn"]))
+
+(define-metafunction Zv
+  isout : Φ q -> #t or #f
+  [(isout (_ ... (q _)) q) #t]
+  [(isout _ _) #f])
 
 (define-metafunction Zv
   dequeue : Φ q -> (Φ v) or #f

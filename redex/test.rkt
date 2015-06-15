@@ -97,7 +97,7 @@
 ;; Convert a Ziria expression and input into an initial machine configuration
 ;;
 (define (exp->mach e in)
-  (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) ((proc (thread () () ,e halt tick) q_1 q_2)))))
+  (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) (q_2) ((proc (thread () () ,e halt tick) q_1 q_2)))))
 
 ;;
 ;; Test that running a Ziria expression with a given intput yields the specified output
@@ -105,7 +105,7 @@
 (define (test-output e in out)
   (define (mach-output-matches? m)
     (match m
-      [`(mach (,_ ... (,_ (queue ,v ...))) ,_) (equal? out v)]
+      [`(mach (,_ ... (,_ (queue ,v ...))) ,_ ,_) (equal? out v)]
       [_ #f]))
   (test-->>∃
    Zmach
@@ -167,6 +167,19 @@
  (judgment-holds
   (types () ,test2 θ) θ)
  '())
+
+;;
+;; Should only consume 1 datum from input queue
+;;
+(define test-not-eager
+  (do pipe
+      >>>
+      (do x <- take
+          (emit x))))
+
+(test-output test-not-eager
+             '(1 2 3)
+             '(1))
 
 ;;(traces Zmach (exp->mach pipe '(1 2)))
  
