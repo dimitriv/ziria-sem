@@ -564,28 +564,21 @@
    
    [--> (mach Φ X_1 (p_1 ... (proc (thread Σ H e κ wait) q_1 q_2) p_2 ...))
         (mach Φ X_2 (p_1 ... (proc (thread Σ H e κ wait) q_1 q_2) p_2 ...))
-        (side-condition (term (∈ q_2 X_1)))
-        (where #f (dequeue Φ q_1))
+        (where #f       (dequeue Φ q_1))
+        (side-condition (or (term (∈ q_2 X_1)) (term (isout Φ q_2))))
         (side-condition (not (term (∈ q_1 X_1))))
-        (where (q ...) X_1)
-        (where X_2     (q_1 q ...))
+        (where (q ...)  X_1)
+        (where X_2      (q_1 q ...))
         "P-Wait"]
    
    [--> (mach Φ_1 X (p_1 ... (proc (thread Σ H e κ wait)     q_1 q_2) p_2 ...))
         (mach Φ_2 X (p_1 ... (proc (thread Σ H e κ (cons v)) q_1 q_2) p_2 ...))
-        (side-condition (term (∈ q_2 X)))
+        (side-condition (or (term (∈ q_2 X)) (term (isout Φ_1 q_2))))
         (where (Φ_2 v) (dequeue Φ_1 q_1))
         "P-Consume"]
    
-   [--> (mach Φ_1 X (p_1 ... (proc (thread Σ H e κ (yield v)) q_1 q_2) p_2 ...))
-        (mach Φ_2 X (p_1 ... (proc (thread Σ H e κ tick)      q_1 q_2) p_2 ...))
-        (side-condition (term (isout Φ_1 q_2)))
-        (where Φ_2 (enqueue Φ_1 q_2 v))
-        "P-YieldOut"]
-   
    [--> (mach Φ_1 X_1 (p_1 ... (proc (thread Σ H e κ (yield v)) q_1 q_2) p_2 ...))
         (mach Φ_2 X_2 (p_1 ... (proc (thread Σ H e κ tick)      q_1 q_2) p_2 ...))
-        (side-condition (not (term (isout Φ_1 q_2))))
         (where X_2 (delete q_2 X_1))
         (where Φ_2 (enqueue Φ_1 q_2 v))
         "P-Yield"]

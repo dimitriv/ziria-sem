@@ -97,7 +97,7 @@
 ;; Convert a Ziria expression and input into an initial machine configuration
 ;;
 (define (exp->mach e in)
-  (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) (q_2) ((proc (thread () () ,e halt tick) q_1 q_2)))))
+  (term (mach ((q_1 (queue ,@in)) (q_2 (queue))) () ((proc (thread () () ,e halt tick) q_1 q_2)))))
 
 ;;
 ;; Test that running a Ziria expression with a given intput yields the specified output
