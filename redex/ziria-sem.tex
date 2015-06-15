@@ -26,7 +26,7 @@
 
 \newcommand{\thread}[5]{\left<#1; #2; #3; #4; #5\right>}
 \newcommand{\proc}[3]{\ll\!#1; #2; #3\!\gg}
-\newcommand{\mach}[2]{\parallel\!#1; #2\!\parallel}
+\newcommand{\mach}[3]{\parallel\!#1; #2; #3\!\parallel}
 
 \newcommand{\queue}[1]{\left<#1\right>}
 
@@ -319,6 +319,9 @@ well-typed program will not share \kw{ref} values between different threads.
   \Phi
      & \bnfdef & \emptyset \\
      & \bnfalt & q = Q, \Phi \\
+  X
+     & \bnfdef & \emptyset \\
+     & \bnfalt & q, X \\
 \end{array}
 \end{equation*}
 \caption{Evaluation contexts}
@@ -334,9 +337,9 @@ heap, $H$, maps locations to values or closures.
 $\kappa$, and an \emph{action} $\delta$. This action represents the thread's
 interaction with the outside world via queues. \emph{Processes} $p$ consist of a
 thread and two queues, an input queue and an output queue. \emph{Machines}
-$\mach{\Phi}{p_1,\ldots,p_n}$ consist of a ``queue heap,'' $\Phi$, that maps
-queue locations $q$ to queues, and a collection of processes. Queues can contain
-zero or more values.
+$\mach{\Phi}{X}{p_1,\ldots,p_n}$ consist of a ``queue heap,'' $\Phi$, that maps
+queue locations $q$ to queues, a wait set $X$, the set of queues waiting for
+input, and a collection of processes. Queues can contain zero or more values.
 
 Evaluation is specified in the form of two small-step relations, one for
 threads, and one for machines. Figure~\ref{fig:eval:base} and
@@ -350,7 +353,14 @@ threads running in parallel, and the domain and codomain are identical.
 The evaluation relation for machines is given in Figure~\ref{fig:eval:mach}. If
 one thread can step, then the machine can step. If a thread needs to synchronize
 via its input/output queues, then the machine can step by either enqueuing or
-dequeuing values to satisfy a thread's action, $\delta$.
+dequeuing values to satisfy a thread's action, $\delta$. The wait set, $X$,
+specifies which queues are waiting for input. The final output queue is treated
+specially; it is always ready to consume input. A thread may only consume input
+when its output queue is ready to consume input; this prevents a thread from
+consuming more input than is necessary to satisfy its downstream
+consumer. Producing output for a queue $q_o$ remove $q_o$ from the wait set. If
+a thread is in the \kw{wait} state and no input is available on its input queue,
+then the input queue is added to the wait set.
 
 \begin{figure*}
 \figurebox{
@@ -515,25 +525,32 @@ dequeuing values to satisfy a thread's action, $\delta$.
 
 \begin{figure*}
 \figurebox{
-\judgment{Machine Evaluation}{\fbox{$\mach{\Phi_1}{\proc{\thread{\Sigma_1}{H_1}{e_1}{\delta_1}}{q_{i_1}}{q_{o_1}}, \ldots} \mstep \mach{\Phi_1'}{\proc{\thread{\Sigma_1'}{H_1'}{e_1'}{\delta_1'}}{q_{i_1}'}{q_{o_1}'}, \ldots}$}}
+\judgment{Machine Evaluation\\ \\}
+{\fbox{$\mach{\Phi_1}{X_1}{\ldots, \proc{\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1}}{q_{i}}{q_{o}}, \ldots} \mstep
+    \mach{\Phi_2}{X_2}{\ldots , \proc{\thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}}{q_{i}}{q_{o}}, \ldots}$}}
 \infrule[P-Tick]
   {\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1} \tstep
    \thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}}
-  {\mach{\Phi}{\ldots \proc{\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1}}{q_i}{q_o} \ldots } \mstep
-   \mach{\Phi}{\ldots \proc{\thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}}{q_i}{q_o} \ldots }}
+  {\mach{\Phi}{X}{\ldots \proc{\thread{\Sigma_1}{H_1}{e_1}{\kappa_1}{\delta_1}}{q_i}{q_o} \ldots } \mstep
+   \mach{\Phi}{X}{\ldots \proc{\thread{\Sigma_2}{H_2}{e_2}{\kappa_2}{\delta_2}}{q_i}{q_o} \ldots }}
+
+\infax[P-Wait]
+  {\mach{\Phi_1}{X}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{wait}}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{\Phi_2}{q_i, X}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{wait}}}{q_i}{q_o} \ldots } \\
+   \text{where $q_i$ empty, $q_o \in X$ or $q_o$ is final output queue, $q_i \notin X$}}
 
 \infax[P-Consume]
-  {\mach{\Phi_1}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{wait}}}{q_i}{q_o} \ldots } \mstep \\
-   \mach{\Phi_2}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{cons}~ v}}{q_i}{q_o} \ldots } \\
-   \text{where $(\Phi_2; v) = dequeue(\Phi_1; q_i)$}}
+  {\mach{\Phi_1}{X}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{wait}}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{\Phi_2}{X}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{cons}~ v}}{q_i}{q_o} \ldots } \\
+   \text{where $q_o \in X$ or $q_o$ is final output queue, $(\Phi_2; v) = dequeue(\Phi_1; q_i)$}}
 
 \infax[P-Yield]
-  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{yield}~ v}}{q_i}{q_o} \ldots } \mstep \\
-   \mach{enqueue(\Phi; q_o; v)}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots }}
+  {\mach{\Phi}{X}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{yield}~ v}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{enqueue(\Phi; q_o; v)}{X \setminus q_o}{\ldots \proc{\thread{\Sigma}{H}{e}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots }}
 
 \infax[P-Spawn]
-  {\mach{\Phi}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
-   \mach{q = \kw{queue}, \Phi}
+  {\mach{\Phi}{X}{\ldots \proc{\thread{\Sigma}{H}{e_1 \arr e_2}{\kappa}{\kw{tick}}}{q_i}{q_o} \ldots } \mstep \\
+   \mach{q = \kw{queue}, \Phi}{X}
    {\ldots \proc{\thread{\Sigma}{H}{e_1}{\kappa}{\kw{tick}}}{q_i}{q},
      \proc{\thread{\Sigma}{H}{e_2}{\kappa}{\kw{tick}}}{q}{q_o} \ldots} \\
    \text{where $q$ fresh}}
